@@ -35,6 +35,9 @@ def test_view_is_single_slug_aware_page(plugin):
     assert "updates:payload" in html
     assert 'type:"protoagent:subscribe",patterns:["simple_kanban.changed"]' in html
     assert 'event.data.topic==="simple_kanban.changed"' in html
+    assert "expected_version:capturedVersion" in html
+    assert 'dialog.addEventListener("cancel",(event)=>{if(state.saving)event.preventDefault();})' in html
+    assert 'form.querySelectorAll("input,textarea,select,button")' in html
 
 
 def test_event_is_namespaced_by_registry(plugin, registry, tmp_path):

@@ -6,7 +6,7 @@ const STATUSES = ["open", "in_progress", "blocked", "deferred", "closed"];
 const LABELS = {open:"Open",in_progress:"In progress",blocked:"Blocked",deferred:"Deferred",closed:"Closed"};
 const PRIORITIES = ["Urgent","High","Normal","Low","Someday"];
 const API = "/api/plugins/simple_kanban";
-const state = {tasks:[], mode:localStorage.getItem("simple-kanban.mode") || "board", query:"", dragging:null, moving:false};
+const state = {tasks:[], mode:localStorage.getItem("simple-kanban.mode") || "board", query:"", dragging:null, moving:false, saving:false};
 const content = document.getElementById("content");
 const notice = document.getElementById("notice");
 const dialog = document.getElementById("task-dialog");
@@ -139,15 +139,17 @@ async function moveTask(id,status,beforeId){
   finally{state.moving=false;render();}
 }
 function openDialog(task=null){
+  if(state.saving)return;
   document.getElementById("dialog-title").textContent=task?"Edit task":"New task";document.getElementById("task-id").value=task?.id||"";document.getElementById("task-version").value=task?.version||"";document.getElementById("task-title").value=task?.title||"";document.getElementById("task-description").value=task?.description||"";document.getElementById("task-status").value=task?.status||"open";document.getElementById("task-priority").value=String(task?.priority??2);document.getElementById("task-type").value=task?.issue_type||"task";document.getElementById("task-assignee").value=task?.assignee||"";dialog.showModal();document.getElementById("task-title").focus();
 }
+function setDialogSaving(saving){state.saving=saving;form.querySelectorAll("input,textarea,select,button").forEach((element)=>{element.disabled=saving;});document.getElementById("cancel-x").disabled=saving;}
 async function saveTask(event){
-  event.preventDefault();const id=document.getElementById("task-id").value;const payload={title:document.getElementById("task-title").value,description:document.getElementById("task-description").value,status:document.getElementById("task-status").value,priority:Number(document.getElementById("task-priority").value),issue_type:document.getElementById("task-type").value,assignee:document.getElementById("task-assignee").value};document.getElementById("save").disabled=true;
+  event.preventDefault();if(state.saving)return;const id=document.getElementById("task-id").value;const payload={title:document.getElementById("task-title").value,description:document.getElementById("task-description").value,status:document.getElementById("task-status").value,priority:Number(document.getElementById("task-priority").value),issue_type:document.getElementById("task-type").value,assignee:document.getElementById("task-assignee").value};const capturedVersion=Number(document.getElementById("task-version").value);setDialogSaving(true);
   try{
-    if(id){const current=taskById(id);const desiredStatus=payload.status;delete payload.status;if(current.status!==desiredStatus)await request(`/tasks/${encodeURIComponent(id)}/move`,{method:"POST",body:JSON.stringify({destination_status:desiredStatus,before_id:null,expected_version:current.version,updates:payload})});else await request(`/tasks/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify({...payload,expected_version:Number(document.getElementById("task-version").value)})});}
+    if(id){const current=taskById(id);const desiredStatus=payload.status;delete payload.status;if(current.status!==desiredStatus)await request(`/tasks/${encodeURIComponent(id)}/move`,{method:"POST",body:JSON.stringify({destination_status:desiredStatus,before_id:null,expected_version:capturedVersion,updates:payload})});else await request(`/tasks/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify({...payload,expected_version:capturedVersion})});}
     else await request("/tasks",{method:"POST",body:JSON.stringify(payload)});
     dialog.close();await load({quiet:true});message(id?"Task updated":"Task created");
-  }catch(error){message(`Save failed: ${error.message}`,true);}finally{document.getElementById("save").disabled=false;}
+  }catch(error){message(`Save failed: ${error.message}`,true);}finally{setDialogSaving(false);}
 }
 async function simpleAction(task,action){
   try{
@@ -165,5 +167,5 @@ function subscribeToChanges(){
 }
 content.addEventListener("click",(event)=>{const button=event.target.closest("button[data-action]");if(!button)return;const owner=button.closest("[data-id]");const task=taskById(owner?.dataset.id);if(task)void simpleAction(task,button.dataset.action);});
 for(const status of STATUSES){const option=node("option","",LABELS[status]);option.value=status;document.getElementById("task-status").append(option);}
-document.getElementById("add-task").addEventListener("click",()=>openDialog());document.getElementById("refresh").addEventListener("click",()=>void load());document.getElementById("board-mode").addEventListener("click",()=>{state.mode="board";localStorage.setItem("simple-kanban.mode",state.mode);render();});document.getElementById("list-mode").addEventListener("click",()=>{state.mode="list";localStorage.setItem("simple-kanban.mode",state.mode);render();});document.getElementById("search").addEventListener("input",(event)=>{state.query=event.target.value;render();});document.getElementById("cancel").addEventListener("click",()=>dialog.close());document.getElementById("cancel-x").addEventListener("click",()=>dialog.close());form.addEventListener("submit",saveTask);window.addEventListener("focus",()=>void load({quiet:true}));subscribeToChanges();setInterval(()=>{if(document.visibilityState==="visible"&&!dialog.open)void load({quiet:true});},15000);
+document.getElementById("add-task").addEventListener("click",()=>openDialog());document.getElementById("refresh").addEventListener("click",()=>void load());document.getElementById("board-mode").addEventListener("click",()=>{state.mode="board";localStorage.setItem("simple-kanban.mode",state.mode);render();});document.getElementById("list-mode").addEventListener("click",()=>{state.mode="list";localStorage.setItem("simple-kanban.mode",state.mode);render();});document.getElementById("search").addEventListener("input",(event)=>{state.query=event.target.value;render();});document.getElementById("cancel").addEventListener("click",()=>{if(!state.saving)dialog.close();});document.getElementById("cancel-x").addEventListener("click",()=>{if(!state.saving)dialog.close();});dialog.addEventListener("cancel",(event)=>{if(state.saving)event.preventDefault();});form.addEventListener("submit",saveTask);window.addEventListener("focus",()=>void load({quiet:true}));subscribeToChanges();setInterval(()=>{if(document.visibilityState==="visible"&&!dialog.open)void load({quiet:true});},15000);
 await load();
