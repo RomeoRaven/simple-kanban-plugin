@@ -94,7 +94,7 @@ def _version(value: Any) -> int:
 
 
 def _issue_type(value: Any) -> str:
-    issue_type = _text(value or "task", "issue_type", required=True, limit=40)
+    issue_type = _text(value, "issue_type", required=True, limit=40)
     if issue_type not in ISSUE_TYPES:
         raise KanbanValidation(f"issue_type must be one of {', '.join(ISSUE_TYPES)}")
     return issue_type

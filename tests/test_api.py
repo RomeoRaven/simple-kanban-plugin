@@ -77,3 +77,8 @@ def test_api_requires_version_and_valid_fields(plugin, tmp_path):
             client.post("/api/plugins/simple_kanban/tasks", json={"title": "Bad", "priority": priority}).status_code
             == 422
         )
+    for issue_type in ("", None):
+        assert (
+            client.post("/api/plugins/simple_kanban/tasks", json={"title": "Bad", "issue_type": issue_type}).status_code
+            == 422
+        )

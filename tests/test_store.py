@@ -102,6 +102,9 @@ def test_validation_and_source_idempotency(plugin, tmp_path):
         store.create(title="")
     with pytest.raises(module.KanbanValidation):
         store.create(title="Bad", status="invented")
+    for issue_type in ("", None):
+        with pytest.raises(module.KanbanValidation, match="issue_type is required"):
+            store.create(title="Bad type", issue_type=issue_type)
     for priority in (True, 1.9):
         with pytest.raises(module.KanbanValidation, match="priority must be an integer"):
             store.create(title="Bad priority", priority=priority)

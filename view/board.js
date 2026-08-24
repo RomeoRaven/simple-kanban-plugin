@@ -40,7 +40,8 @@ function filteredTasks() {
   return state.tasks.filter((task) => [task.title,task.description,task.assignee,task.issue_type]
     .some((value) => String(value || "").toLocaleLowerCase().includes(query)));
 }
-function tasksIn(status) { return filteredTasks().filter((task) => task.status === status).sort((a,b) => a.position-b.position); }
+function rankedTasks(status) { return state.tasks.filter((task) => task.status === status).sort((a,b) => a.position-b.position); }
+function tasksIn(status) { const visible=new Set(filteredTasks().map((task)=>task.id));return rankedTasks(status).filter((task)=>visible.has(task.id)); }
 function taskById(id) { return state.tasks.find((task) => task.id === id); }
 
 function statusSelect(task) {
@@ -154,7 +155,7 @@ async function saveTask(event){
 async function simpleAction(task,action){
   try{
     if(action==="edit"){openDialog(task);return;}
-    if(action==="earlier"||action==="later"){const column=tasksIn(task.status);const index=column.findIndex((x)=>x.id===task.id);let before=null;if(action==="earlier"&&index>0)before=column[index-1].id;else if(action==="later"&&index<column.length-1)before=column[index+2]?.id||null;else return;await moveTask(task.id,task.status,before);return;}
+    if(action==="earlier"||action==="later"){const column=rankedTasks(task.status);const index=column.findIndex((x)=>x.id===task.id);let before=null;if(action==="earlier"&&index>0)before=column[index-1].id;else if(action==="later"&&index<column.length-1)before=column[index+2]?.id||null;else return;await moveTask(task.id,task.status,before);return;}
     if(action==="close")await request(`/tasks/${encodeURIComponent(task.id)}/close`,{method:"POST",body:JSON.stringify({expected_version:task.version,reason:"Closed from Kanban"})});
     if(action==="reopen")await request(`/tasks/${encodeURIComponent(task.id)}/reopen`,{method:"POST",body:JSON.stringify({expected_version:task.version})});
     if(action==="delete"){if(!confirm(`Delete “${task.title}”?`))return;await request(`/tasks/${encodeURIComponent(task.id)}?expected_version=${task.version}`,{method:"DELETE"});}
