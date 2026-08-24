@@ -102,6 +102,9 @@ def test_validation_and_source_idempotency(plugin, tmp_path):
         store.create(title="")
     with pytest.raises(module.KanbanValidation):
         store.create(title="Bad", status="invented")
+    for field, value in (("title", ["not", "text"]), ("description", {"bad": "shape"}), ("assignee", 7)):
+        with pytest.raises(module.KanbanValidation, match="must be a string"):
+            store.create(**{"title": "Valid", field: value})
     for issue_type in ("", None):
         with pytest.raises(module.KanbanValidation, match="issue_type is required"):
             store.create(title="Bad type", issue_type=issue_type)

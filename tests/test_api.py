@@ -82,3 +82,5 @@ def test_api_requires_version_and_valid_fields(plugin, tmp_path):
             client.post("/api/plugins/simple_kanban/tasks", json={"title": "Bad", "issue_type": issue_type}).status_code
             == 422
         )
+    for field, value in (("title", ["not", "text"]), ("description", {"bad": "shape"}), ("assignee", 7)):
+        assert client.post("/api/plugins/simple_kanban/tasks", json={"title": "Valid", field: value}).status_code == 422

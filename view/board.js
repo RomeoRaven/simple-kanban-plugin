@@ -11,6 +11,7 @@ const content = document.getElementById("content");
 const notice = document.getElementById("notice");
 const dialog = document.getElementById("task-dialog");
 const form = document.getElementById("task-form");
+let loadGeneration = 0;
 
 function node(tag, cls, text) {
   const element = document.createElement(tag);
@@ -119,8 +120,9 @@ function render() {
   document.getElementById("list-mode").setAttribute("aria-pressed",String(state.mode==="list"));
 }
 async function load({quiet=false}={}) {
-  try { const data=await request("/tasks"); state.tasks=data.tasks; render(); if(!quiet) message(`${state.tasks.length} task${state.tasks.length===1?"":"s"}`); }
-  catch(error){ content.replaceChildren(node("div","global-empty","Kanban could not load.")); content.setAttribute("aria-busy","false"); message(`Load failed: ${error.message}`,true); }
+  const generation=++loadGeneration;
+  try { const data=await request("/tasks");if(generation!==loadGeneration)return;state.tasks=data.tasks;render();if(!quiet)message(`${state.tasks.length} task${state.tasks.length===1?"":"s"}`); }
+  catch(error){if(generation!==loadGeneration)return;content.replaceChildren(node("div","global-empty","Kanban could not load."));content.setAttribute("aria-busy","false");message(`Load failed: ${error.message}`,true);}
 }
 function optimisticMove(id,status,beforeId){
   const task=taskById(id); if(!task)return;
@@ -153,14 +155,18 @@ async function saveTask(event){
   }catch(error){message(`Save failed: ${error.message}`,true);}finally{setDialogSaving(false);}
 }
 async function simpleAction(task,action){
+  if(action==="edit"){openDialog(task);return;}
+  if(action==="earlier"||action==="later"){const column=rankedTasks(task.status);const index=column.findIndex((x)=>x.id===task.id);let before=null;if(action==="earlier"&&index>0)before=column[index-1].id;else if(action==="later"&&index<column.length-1)before=column[index+2]?.id||null;else return;await moveTask(task.id,task.status,before);return;}
+  if(state.moving){message("A task change is already saving");return;}
+  if(action==="delete"&&!confirm(`Delete “${task.title}”?`))return;
+  state.moving=true;render();message("Saving change…");
   try{
-    if(action==="edit"){openDialog(task);return;}
-    if(action==="earlier"||action==="later"){const column=rankedTasks(task.status);const index=column.findIndex((x)=>x.id===task.id);let before=null;if(action==="earlier"&&index>0)before=column[index-1].id;else if(action==="later"&&index<column.length-1)before=column[index+2]?.id||null;else return;await moveTask(task.id,task.status,before);return;}
     if(action==="close")await request(`/tasks/${encodeURIComponent(task.id)}/close`,{method:"POST",body:JSON.stringify({expected_version:task.version,reason:"Closed from Kanban"})});
     if(action==="reopen")await request(`/tasks/${encodeURIComponent(task.id)}/reopen`,{method:"POST",body:JSON.stringify({expected_version:task.version})});
-    if(action==="delete"){if(!confirm(`Delete “${task.title}”?`))return;await request(`/tasks/${encodeURIComponent(task.id)}?expected_version=${task.version}`,{method:"DELETE"});}
+    if(action==="delete")await request(`/tasks/${encodeURIComponent(task.id)}?expected_version=${task.version}`,{method:"DELETE"});
     await load({quiet:true});message(action==="delete"?"Task deleted":"Task updated");
   }catch(error){message(`${action} failed: ${error.message}`,true);await load({quiet:true});}
+  finally{state.moving=false;render();}
 }
 function subscribeToChanges(){
   window.addEventListener("message",(event)=>{if(event.source===window.parent&&event.data?.type==="protoagent:event"&&event.data.topic==="simple_kanban.changed")void load({quiet:true});});

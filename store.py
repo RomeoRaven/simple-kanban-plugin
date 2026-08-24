@@ -50,7 +50,12 @@ def default_db_path() -> Path:
 
 
 def _text(value: Any, field: str, *, required: bool = False, limit: int = 20_000) -> str:
-    text = str(value or "").strip()
+    if value is None:
+        text = ""
+    elif isinstance(value, str):
+        text = value.strip()
+    else:
+        raise KanbanValidation(f"{field} must be a string")
     if required and not text:
         raise KanbanValidation(f"{field} is required")
     if len(text) > limit:

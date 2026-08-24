@@ -39,6 +39,8 @@ def test_view_is_single_slug_aware_page(plugin):
     assert 'dialog.addEventListener("cancel",(event)=>{if(state.saving)event.preventDefault();})' in html
     assert 'form.querySelectorAll("input,textarea,select,button")' in html
     assert "const column=rankedTasks(task.status)" in html
+    assert "generation!==loadGeneration" in html
+    assert 'if(state.moving){message("A task change is already saving")' in html
 
 
 def test_event_is_namespaced_by_registry(plugin, registry, tmp_path):
