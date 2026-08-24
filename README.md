@@ -1,36 +1,61 @@
-# simple-kanban-plugin
+# Simple Kanban
 
-Design stub for **Kanban**, a self-reliant ranked task-board plugin for [protoAgent](https://github.com/protoLabsAI/protoAgent).
+A self-reliant ranked List/Kanban working queue for [protoAgent](https://github.com/protoLabsAI/protoAgent).
 
-Status: **design review only**. The repository contains an importable Plugin DevKit scaffold and the proposed implementation plan; it does not yet provide the planned task store or Kanban workflow.
+Status: **v0.1.0 development candidate**. Linux source qualification is complete; S1-dev live review is the next acceptance gate. S1-stable and Windows are not yet qualified.
 
-## Why it exists
+## What it provides
 
-Kanban is intended to provide a lightweight operator-and-agent task queue with durable manual ranking, List/Kanban views, and accessible card movement without changing protoAgent core. It is deliberately separate from the upstream Project Board coding-orchestration plugin.
+- Native primary-rail **Kanban** view with Board and List modes.
+- Five durable states: Open, In progress, Blocked, Deferred, and Closed.
+- Atomic same-column rank and cross-column move operations.
+- Drag/drop plus status selectors and earlier/later controls for keyboard, screen-reader, and mobile fallback.
+- Create, edit, move, close, reopen, and delete controls.
+- Search, optimistic move display, stale-write conflict detection, rollback, and authoritative refresh.
+- Six namespaced agent tools using the same task store and ordering as the UI.
+- Plugin-owned SQLite state under the active protoAgent instance root; no core schema edits or private plugin imports.
+- A `simple_kanban.changed` event hint after committed mutations.
 
-## Review the proposal
-
-Read [`docs/PLAN.md`](docs/PLAN.md). Feedback is welcome through [GitHub Issues](https://github.com/RomeoRaven/simple-kanban-plugin/issues).
-
-## Current stub
-
-The scaffold follows the upstream protoAgent Plugin DevKit contract and contributes only:
-
-- a placeholder console view;
-- `simple_kanban_status`, which reports that implementation is pending;
-- host-free scaffold tests and CI.
+This is deliberately separate from protoAgent core Tasks and the Project Board coding-orchestration plugin. It is a lightweight daily queue, not a repository orchestration system.
 
 ## Compatibility
 
-Design target: protoAgent `v0.147.0` or later. No release or production compatibility claim is made yet.
+- protoAgent `>=0.147.0`
+- Python `>=3.11`
+- No third-party runtime dependencies beyond libraries provided by the host
+
+The selected v0.147.0 host documents `infra.paths.instance_paths()` as its instance-store invariant. Simple Kanban uses that exact host seam and keeps its database at `simple_kanban/simple_kanban.db` under the active instance root. Upstream issue #1 remains open for an explicit long-term external-plugin persistence contract.
+
+## Install
+
+```sh
+python -m server plugin install https://github.com/RomeoRaven/simple-kanban-plugin --ref <exact-ref>
+```
+
+CLI installation is fetch-only. Enable `simple_kanban` explicitly in the selected instance's `plugins.enabled`, then restart or reload that instance. Git installation records the resolved commit in `plugins.lock`.
+
+## Development
+
+```sh
+python -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt ruff
+.venv/bin/ruff check .
+.venv/bin/ruff format --check tests/
+.venv/bin/pytest -q
+```
+
+## Data model
+
+Each task owns a stable ID, title, description, status, dense per-status position, optimistic-concurrency version, priority, issue type, assignee, lifecycle timestamps, close metadata, and optional source identity. Every move runs in one SQLite transaction and renumbers affected columns before commit.
 
 ## Platform status
 
 | Platform | Status | Evidence / follow-up |
 |---|---|---|
-| Linux | Tested | Host-free scaffold tests only |
-| Windows | Not tested | Native qualification after implementation |
-| macOS | Not tested | Qualification after implementation |
+| Linux source | Tested | Store/API/registration/concurrency tests, Ruff, manifest and JS syntax checks |
+| S1-dev | Pending live acceptance | Exact candidate deployment and Dennis review |
+| S1-stable | Not deployed | Requires Dennis acceptance and separate promotion |
+| Windows | Not tested | Deferred; no PC1 work in this tranche |
 
 ## License
 

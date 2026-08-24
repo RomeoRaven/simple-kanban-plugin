@@ -1,6 +1,6 @@
 # Kanban plugin — extraction specification
 
-Status: Design extraction from accepted S1 candidate; implementation not yet authorized
+Status: v0.1.0 implementation candidate for S1-dev acceptance; stable and Windows remain unqualified
 Date: 2026-08-23
 Source behavior: accepted RR candidate `90d77beaf29db6f1d2ca03e5c4988226d0dc5eca`
 Target host reviewed: upstream protoAgent `v0.147.0`

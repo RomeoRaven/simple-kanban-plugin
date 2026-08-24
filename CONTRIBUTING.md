@@ -1,10 +1,19 @@
 # Contributing
 
-This repository is currently a design stub. Feedback on the proposal is welcome through GitHub Issues.
+Simple Kanban is an external protoAgent plugin. Contributions should keep it self-reliant and installable on an unmodified supported protoAgent host.
 
-Before implementation, changes should:
+Before submitting a change:
 
-1. preserve compatibility with an unmodified upstream protoAgent host;
-2. use documented plugin contracts and public host APIs only;
-3. avoid private core imports and core source changes;
-4. include focused tests for any implemented behavior.
+1. Read `PROTO.md` and `docs/PLAN.md`.
+2. Use only documented host contracts; do not import another plugin or write a core database.
+3. Keep task status and rank changes atomic.
+4. Preserve optimistic-concurrency checks, keyboard/mobile fallbacks, and slug-aware authenticated API calls.
+5. Run:
+
+```sh
+ruff check .
+ruff format --check tests/
+pytest -q
+```
+
+Open design and compatibility questions belong in GitHub Issues before broadening the public contract.

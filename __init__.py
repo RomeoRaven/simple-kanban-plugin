@@ -1,53 +1,47 @@
-"""Kanban design stub scaffolded from the protoAgent Plugin DevKit."""
+"""Simple Kanban — a plugin-owned ranked working queue."""
 
 from __future__ import annotations
 
-from langchain_core.tools import tool
+from pathlib import Path
+
+_VIEW_ROOT = Path(__file__).parent / "view"
 
 
-@tool
-def simple_kanban_status() -> str:
-    """Report the implementation status of the Simple Kanban plugin."""
-    return "simple-kanban-plugin is a design stub; implementation is pending. See docs/PLAN.md."
+def _view_html() -> str:
+    template = (_VIEW_ROOT / "board.html").read_text(encoding="utf-8")
+    css = (_VIEW_ROOT / "board.css").read_text(encoding="utf-8")
+    javascript = (_VIEW_ROOT / "board.js").read_text(encoding="utf-8")
+    return template.replace("{{CSS}}", css).replace("{{JS}}", javascript)
 
 
-def _page_router():
+def build_view_router():
     from fastapi import APIRouter
     from fastapi.responses import HTMLResponse
 
     router = APIRouter()
 
-    @router.get("/view")
-    async def view():
-        return HTMLResponse(
-            "<!doctype html><html><head><meta charset='utf-8'>"
-            "<script>window.__base=location.pathname.split('/plugins/')[0];"
-            "var l=document.createElement('link');l.rel='stylesheet';"
-            "l.href=window.__base+'/_ds/plugin-kit.css';document.head.appendChild(l);</script>"
-            "<style>body{margin:0;padding:32px;background:var(--pl-color-bg);"
-            "color:var(--pl-color-fg);font-family:var(--pl-font-sans,system-ui)}</style>"
-            "</head><body><h1>Kanban</h1><p>Design stub — implementation pending.</p>"
-            "<script type='module'>const kit=await import(window.__base+'/_ds/plugin-kit.js');"
-            "kit.initPluginView();</script></body></html>"
-        )
-
-    return router
-
-
-def _data_router():
-    from fastapi import APIRouter
-
-    router = APIRouter()
-
-    @router.get("/status")
-    async def status():
-        return {"plugin": "simple_kanban", "status": "design-stub"}
+    @router.get("/view", response_class=HTMLResponse)
+    async def view() -> str:
+        # Read source per request so an isolated development install can refresh
+        # without a frontend build. Installed plugin releases remain exact pins.
+        return _view_html()
 
     return router
 
 
 def register(registry) -> None:
-    registry.register_tool(simple_kanban_status)
+    # Lazy package-relative imports keep the repository host-free under pytest,
+    # while the host loads this file under its synthetic plugin package name.
+    from .api import build_data_router
+    from .events import bind_registry
+    from .tools import TOOLS
+
+    bind_registry(registry)
+    for kanban_tool in TOOLS:
+        registry.register_tool(kanban_tool)
     registry.register_skill_dir("skills")
-    registry.register_router(_page_router(), prefix="/plugins/simple_kanban")
-    registry.register_router(_data_router(), prefix="/api/plugins/simple_kanban")
+    registry.register_router(build_view_router(), prefix="/plugins/simple_kanban")
+    registry.register_router(build_data_router(), prefix="/api/plugins/simple_kanban")
+
+
+__all__ = ["register"]

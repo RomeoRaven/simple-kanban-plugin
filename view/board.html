@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kanban</title>
+<script>
+window.__base=location.pathname.split('/plugins/')[0];
+document.write('<link rel="stylesheet" href="'+window.__base+'/_ds/plugin-kit.css">');
+</script>
+<style>{{CSS}}</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div>
+      <h1>Kanban</h1>
+      <p class="subtitle">A simple ranked working queue</p>
+    </div>
+    <div class="toolbar" role="toolbar" aria-label="Kanban controls">
+      <label class="search-label"><span class="sr-only">Search tasks</span><input id="search" class="pl-input" type="search" placeholder="Search tasks"></label>
+      <div class="view-switch" role="group" aria-label="View mode">
+        <button id="board-mode" class="pl-btn pl-btn--sm" type="button" aria-pressed="true">Board</button>
+        <button id="list-mode" class="pl-btn pl-btn--sm" type="button" aria-pressed="false">List</button>
+      </div>
+      <button id="refresh" class="pl-btn pl-btn--sm" type="button">Refresh</button>
+      <button id="add-task" class="pl-btn pl-btn--primary" type="button">+ Task</button>
+    </div>
+  </header>
+  <div id="notice" class="notice" role="status" aria-live="polite"></div>
+  <main id="content" aria-busy="true"></main>
+</div>
+
+<dialog id="task-dialog" aria-labelledby="dialog-title">
+  <form id="task-form" method="dialog">
+    <div class="dialog-head"><h2 id="dialog-title">New task</h2><button class="icon-btn" id="cancel-x" type="button" aria-label="Close">×</button></div>
+    <input id="task-id" type="hidden">
+    <input id="task-version" type="hidden">
+    <label>Title<input id="task-title" class="pl-input" maxlength="500" required></label>
+    <label>Description<textarea id="task-description" class="pl-input" rows="4" maxlength="20000"></textarea></label>
+    <div class="form-grid">
+      <label>Status<select id="task-status" class="pl-input"></select></label>
+      <label>Priority<select id="task-priority" class="pl-input"><option value="0">Urgent</option><option value="1">High</option><option value="2" selected>Normal</option><option value="3">Low</option><option value="4">Someday</option></select></label>
+      <label>Type<select id="task-type" class="pl-input"><option>task</option><option>bug</option><option>feature</option><option>chore</option><option>epic</option></select></label>
+      <label>Assignee<input id="task-assignee" class="pl-input" maxlength="200"></label>
+    </div>
+    <div class="dialog-actions"><button id="cancel" class="pl-btn" type="button">Cancel</button><button id="save" class="pl-btn pl-btn--primary" type="submit">Save</button></div>
+  </form>
+</dialog>
+<script type="module">{{JS}}</script>
+</body>
+</html>
