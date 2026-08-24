@@ -89,10 +89,14 @@ simple-kanban-plugin/
 
 ### Storage
 
+- Start from the selected protoAgent revision's Plugin DevKit scaffold, plugin guide, SDK, and maker-owned persistence examples; do not infer a database convention from a prior plugin or private core implementation.
+- protoAgent has multiple per-instance stores, not one central SQLite schema for plugins to extend.
 - Plugin-owned SQLite database with WAL, busy timeout, guarded schema migrations, and atomic transactions.
-- Configurable data path with a documented per-instance default supported by the target host.
+- Use only a documented per-instance persistence-path seam supported by the target host. If the selected host revision exposes no such public seam, treat that as a compatibility blocker rather than importing a private path helper or inventing a fixed path.
 - Runtime state stays outside the installed plugin source directory.
-- No imports from core `tasks.store`, no reads of core `issues.db`, and no schema patching of native Tasks.
+- The plugin owns its schema, migrations, transactions, backup, recovery, and retention.
+- No imports from core `tasks.store`, no reads of core `issues.db`, no plugin tables in a core database, and no schema patching of native Tasks.
+- Interoperate with native Tasks and other plugins only through documented APIs, SDK functions, tools, and events—not shared SQLite access.
 
 ### Plugin API
 
