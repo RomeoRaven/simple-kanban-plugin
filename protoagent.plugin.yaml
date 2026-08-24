@@ -1,0 +1,16 @@
+id: simple_kanban
+name: Kanban
+version: 0.0.0
+description: >-
+  Design stub for a self-reliant ranked task queue with List and Kanban views.
+  Implementation is pending; see docs/PLAN.md.
+enabled: false
+min_protoagent_version: "0.147.0"
+repository: https://github.com/RomeoRaven/simple-kanban-plugin
+homepage: https://agent.protolabs.studio
+capabilities:
+  network: []
+  filesystem: none
+config_section: simple_kanban
+views:
+  - { id: main, label: "Kanban", icon: LayoutGrid, path: /plugins/simple_kanban/view }
