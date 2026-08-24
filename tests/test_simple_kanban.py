@@ -43,6 +43,7 @@ def test_view_is_single_slug_aware_page(plugin):
     assert "required?load({quiet,required}):false" in html
     assert "required:true" in html
     assert 'if(state.moving){message("A task change is already saving")' in html
+    assert "color-scheme:light dark" in html
 
 
 def test_event_is_namespaced_by_registry(plugin, registry, tmp_path):
