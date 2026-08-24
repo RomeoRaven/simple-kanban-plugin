@@ -32,7 +32,7 @@ import sys
 import types
 from pathlib import Path
 
-__all__ = ["plugin_module_name", "load_plugin", "install_host_stubs", "FakeRegistry"]
+__all__ = ["FakeRegistry", "install_host_stubs", "load_plugin", "plugin_module_name"]
 
 
 def plugin_module_name(plugin_id: str) -> str:
@@ -135,12 +135,12 @@ class _StubKnobs:
         self.defined: dict = {}
         self.defined_presets: dict = {}
 
-    def define(self, name=None, default=None, **_k) -> "_StubKnobs":
+    def define(self, name=None, default=None, **_k) -> _StubKnobs:
         if name is not None:
             self.defined[name] = default
         return self
 
-    def preset(self, name=None, overrides=None, **_k) -> "_StubKnobs":
+    def preset(self, name=None, overrides=None, **_k) -> _StubKnobs:
         if name is not None:
             self.defined_presets[name] = dict(overrides or {})
         return self
@@ -210,7 +210,7 @@ def install_host_stubs(extra: dict | None = None) -> list[str]:
         try:
             __import__(name)  # a real host module is installed → use it
             continue
-        except Exception:
+        except Exception:  # noqa: BLE001, S110 - host modules may fail during import
             pass
         module = _StubModule(name, specs[name])  # attrs set only when we CREATE the stub,
         sys.modules[name] = module  # so a real host module is never clobbered

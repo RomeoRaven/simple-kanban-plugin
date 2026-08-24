@@ -25,7 +25,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # so `import _plugin_testkit` resolves
 
-from _plugin_testkit import FakeRegistry, install_host_stubs, load_plugin  # noqa: E402
+from _plugin_testkit import FakeRegistry, install_host_stubs, load_plugin
 
 ROOT = Path(__file__).resolve().parent.parent
 PLUGIN_ID = "simple-kanban"
