@@ -102,6 +102,9 @@ def test_validation_and_source_idempotency(plugin, tmp_path):
         store.create(title="")
     with pytest.raises(module.KanbanValidation):
         store.create(title="Bad", status="invented")
+    for priority in (True, 1.9):
+        with pytest.raises(module.KanbanValidation, match="priority must be an integer"):
+            store.create(title="Bad priority", priority=priority)
     one = store.create(title="Imported", source_kind="test", source_id="1")
     same = store.create(title="Duplicate", source_kind="test", source_id="1")
     assert same["id"] == one["id"]
@@ -117,3 +120,13 @@ def test_concurrent_creates_have_dense_unique_rank(plugin, tmp_path):
     assert sorted(task["position"] for task in tasks) == list(range(1, 41))
     assert len({task["id"] for task in tasks}) == 40
     assert store.integrity() == "ok"
+
+
+def test_distinct_stores_coordinate_first_schema_use(plugin, tmp_path):
+    module = importlib.import_module(plugin.__name__ + ".store")
+    path = tmp_path / "shared.db"
+    stores = [module.KanbanStore(path) for _ in range(12)]
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        list(pool.map(lambda pair: pair[1].create(title=f"Task {pair[0]}"), enumerate(stores)))
+    assert len(stores[0].list()) == 12
+    assert stores[-1].integrity() == "ok"

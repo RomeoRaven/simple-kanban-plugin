@@ -83,6 +83,7 @@ def build_data_router():
                 before_id=payload.get("before_id"),
                 expected_version=payload.get("expected_version", -1),
                 close_reason=payload.get("close_reason"),
+                updates=payload.get("updates"),
             )
         )
         emit_changed("moved", task)

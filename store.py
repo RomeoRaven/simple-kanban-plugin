@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 import threading
+import time
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -15,6 +16,7 @@ STATUSES = ("open", "in_progress", "blocked", "deferred", "closed")
 STATUS_INDEX = {status: index for index, status in enumerate(STATUSES)}
 PRIORITIES = (0, 1, 2, 3, 4)
 ISSUE_TYPES = ("task", "bug", "feature", "chore", "epic")
+_SCHEMA_LOCK = threading.Lock()
 
 
 class KanbanError(Exception):
@@ -64,10 +66,14 @@ def _status(value: Any) -> str:
 
 
 def _priority(value: Any) -> int:
-    try:
+    if isinstance(value, bool):
+        raise KanbanValidation("priority must be an integer from 0 to 4")
+    if isinstance(value, int):
+        priority = value
+    elif isinstance(value, str) and value.isdigit():
         priority = int(value)
-    except (TypeError, ValueError) as exc:
-        raise KanbanValidation("priority must be an integer from 0 to 4") from exc
+    else:
+        raise KanbanValidation("priority must be an integer from 0 to 4")
     if priority not in PRIORITIES:
         raise KanbanValidation("priority must be an integer from 0 to 4")
     return priority
@@ -94,13 +100,33 @@ def _issue_type(value: Any) -> str:
     return issue_type
 
 
+def _edits(fields: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(fields, dict):
+        raise KanbanValidation("updates must be an object")
+    allowed = {"title", "description", "priority", "issue_type", "assignee"}
+    unknown = sorted(set(fields) - allowed)
+    if unknown:
+        raise KanbanValidation(f"unsupported field {unknown[0]}")
+    values: dict[str, Any] = {}
+    if "title" in fields:
+        values["title"] = _text(fields["title"], "title", required=True, limit=500)
+    if "description" in fields:
+        values["description"] = _text(fields["description"], "description")
+    if "priority" in fields:
+        values["priority"] = _priority(fields["priority"])
+    if "issue_type" in fields:
+        values["issue_type"] = _issue_type(fields["issue_type"])
+    if "assignee" in fields:
+        values["assignee"] = _text(fields["assignee"], "assignee", limit=200)
+    return values
+
+
 class KanbanStore:
     """SQLite store with transactionally dense rank per status column."""
 
     def __init__(self, db_path: str | Path | None = None) -> None:
         self.path = Path(db_path) if db_path is not None else default_db_path()
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._init_lock = threading.Lock()
         self._initialized = False
 
     def _connect(self) -> sqlite3.Connection:
@@ -114,12 +140,14 @@ class KanbanStore:
     def _ensure_schema(self, conn: sqlite3.Connection) -> None:
         if self._initialized:
             return
-        with self._init_lock:
+        with _SCHEMA_LOCK:
             if self._initialized:
                 return
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.executescript(
-                """
+            for attempt in range(5):
+                try:
+                    conn.execute("PRAGMA journal_mode=WAL")
+                    conn.executescript(
+                        """
                 CREATE TABLE IF NOT EXISTS kanban_tasks (
                     id TEXT PRIMARY KEY,
                     title TEXT NOT NULL,
@@ -143,9 +171,14 @@ class KanbanStore:
                     ON kanban_tasks(source_kind, source_id)
                     WHERE source_kind IS NOT NULL AND source_id IS NOT NULL;
                 PRAGMA user_version=1;
-                """
-            )
-            self._initialized = True
+                        """
+                    )
+                    self._initialized = True
+                    return
+                except sqlite3.OperationalError as exc:
+                    if "locked" not in str(exc).lower() or attempt == 4:
+                        raise
+                    time.sleep(0.05 * (2**attempt))
 
     @contextmanager
     def _write(self) -> Iterator[sqlite3.Connection]:
@@ -260,26 +293,12 @@ class KanbanStore:
             return self._row(conn.execute("SELECT * FROM kanban_tasks WHERE id=?", (task_id,)).fetchone())
 
     def update(self, task_id: str, *, expected_version: int, **fields: Any) -> dict[str, Any]:
-        allowed = {"title", "description", "priority", "issue_type", "assignee"}
-        unknown = sorted(set(fields) - allowed)
-        if unknown:
-            raise KanbanValidation(f"unsupported field {unknown[0]}")
+        values = _edits(fields)
         expected_version = _version(expected_version)
         with self._write() as conn:
             current = self._row(conn.execute("SELECT * FROM kanban_tasks WHERE id=?", (task_id,)).fetchone())
             if int(current["version"]) != expected_version:
                 raise KanbanConflict("task changed; reload and try again")
-            values: dict[str, Any] = {}
-            if "title" in fields:
-                values["title"] = _text(fields["title"], "title", required=True, limit=500)
-            if "description" in fields:
-                values["description"] = _text(fields["description"], "description")
-            if "priority" in fields:
-                values["priority"] = _priority(fields["priority"])
-            if "issue_type" in fields:
-                values["issue_type"] = _issue_type(fields["issue_type"])
-            if "assignee" in fields:
-                values["assignee"] = _text(fields["assignee"], "assignee", limit=200)
             if not values:
                 return current
             sets = ", ".join(f"{key}=?" for key in values)
@@ -297,10 +316,12 @@ class KanbanStore:
         before_id: str | None,
         expected_version: int,
         close_reason: str | None = None,
+        updates: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         destination_status = _status(destination_status)
         before_id = _text(before_id, "before_id", limit=100) or None
         expected_version = _version(expected_version)
+        values = _edits({} if updates is None else updates)
         with self._write() as conn:
             current = self._row(conn.execute("SELECT * FROM kanban_tasks WHERE id=?", (task_id,)).fetchone())
             if int(current["version"]) != expected_version:
@@ -323,18 +344,13 @@ class KanbanStore:
                 if entering_closed
                 else (None if leaving_closed else current["close_reason"])
             )
-            conn.execute(
-                """UPDATE kanban_tasks
-                   SET status=?, version=version+1, updated_at=?, closed_at=?, close_reason=?
-                   WHERE id=?""",
-                (
-                    destination_status,
-                    now,
-                    closed_at,
-                    reason,
-                    task_id,
-                ),
-            )
+            sets = ["status=?", "version=version+1", "updated_at=?", "closed_at=?", "close_reason=?"]
+            params: list[Any] = [destination_status, now, closed_at, reason]
+            for key, value in values.items():
+                sets.append(f"{key}=?")
+                params.append(value)
+            params.append(task_id)
+            conn.execute(f"UPDATE kanban_tasks SET {', '.join(sets)} WHERE id=?", params)
             if destination_status != source_status:
                 self._renumber(conn, source_status, source_ids)
             self._renumber(conn, destination_status, destination_ids)
