@@ -66,6 +66,36 @@ def test_stale_writes_conflict_without_mutation(plugin, tmp_path):
     assert store.get(task["id"])["version"] == newer["version"]
 
 
+def test_closed_reorder_preserves_terminal_metadata(plugin, tmp_path):
+    store, _ = _store(plugin, tmp_path)
+    first = store.create(title="First")
+    second = store.create(title="Second", status="closed")
+    closed = store.close(first["id"], expected_version=first["version"], reason="accepted")
+    reordered = store.move(
+        first["id"],
+        destination_status="closed",
+        before_id=second["id"],
+        expected_version=closed["version"],
+    )
+    assert reordered["closed_at"] == closed["closed_at"]
+    assert reordered["close_reason"] == "accepted"
+
+
+def test_malformed_versions_are_validation_errors(plugin, tmp_path):
+    store, module = _store(plugin, tmp_path)
+    task = store.create(title="Guarded")
+    operations = (
+        lambda: store.update(task["id"], expected_version="old", title="Changed"),
+        lambda: store.move(task["id"], destination_status="blocked", before_id=None, expected_version="old"),
+        lambda: store.close(task["id"], expected_version="old"),
+        lambda: store.delete(task["id"], expected_version="old"),
+    )
+    for operation in operations:
+        with pytest.raises(module.KanbanValidation, match="positive integer"):
+            operation()
+    assert store.get(task["id"])["version"] == 1
+
+
 def test_validation_and_source_idempotency(plugin, tmp_path):
     store, module = _store(plugin, tmp_path)
     with pytest.raises(module.KanbanValidation):

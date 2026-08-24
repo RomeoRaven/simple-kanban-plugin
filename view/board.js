@@ -6,7 +6,7 @@ const STATUSES = ["open", "in_progress", "blocked", "deferred", "closed"];
 const LABELS = {open:"Open",in_progress:"In progress",blocked:"Blocked",deferred:"Deferred",closed:"Closed"};
 const PRIORITIES = ["Urgent","High","Normal","Low","Someday"];
 const API = "/api/plugins/simple_kanban";
-const state = {tasks:[], mode:localStorage.getItem("simple-kanban.mode") || "board", query:"", dragging:null};
+const state = {tasks:[], mode:localStorage.getItem("simple-kanban.mode") || "board", query:"", dragging:null, moving:false};
 const content = document.getElementById("content");
 const notice = document.getElementById("notice");
 const dialog = document.getElementById("task-dialog");
@@ -45,6 +45,7 @@ function taskById(id) { return state.tasks.find((task) => task.id === id); }
 
 function statusSelect(task) {
   const select = node("select", "pl-input status-select");
+  select.disabled = state.moving;
   select.setAttribute("aria-label", `Status for ${task.title}`);
   for (const status of STATUSES) {
     const option = node("option", "", LABELS[status]); option.value = status; option.selected = status === task.status; select.append(option);
@@ -53,11 +54,12 @@ function statusSelect(task) {
   return select;
 }
 function actionButton(label, action, title=label) {
-  const button = node("button", "", label); button.type="button"; button.dataset.action=action; button.title=title; return button;
+  const button = node("button", "", label); button.type="button"; button.dataset.action=action; button.title=title; button.disabled=state.moving; return button;
 }
 function card(task) {
-  const article = node("article", "card"); article.dataset.id=task.id; article.draggable=true;
+  const article = node("article", "card"); article.dataset.id=task.id; article.draggable=!state.moving;
   const handle = node("button", "drag-handle", "⠿"); handle.type="button"; handle.title="Drag to move"; handle.setAttribute("aria-label",`Drag ${task.title}`);
+  handle.disabled=state.moving;
   handle.addEventListener("pointerdown", () => { article.dataset.armed="true"; });
   handle.addEventListener("pointerup", () => { delete article.dataset.armed; });
   article.addEventListener("dragstart", (event) => {
@@ -67,7 +69,7 @@ function card(task) {
   article.addEventListener("dragend", () => { state.dragging=null; delete article.dataset.armed; article.classList.remove("dragging"); document.querySelectorAll(".drop-before,.drag-over").forEach((x)=>x.classList.remove("drop-before","drag-over")); });
   article.addEventListener("dragover", (event) => { if (state.dragging && state.dragging !== task.id) { event.preventDefault(); article.classList.add("drop-before"); } });
   article.addEventListener("dragleave", () => article.classList.remove("drop-before"));
-  article.addEventListener("drop", (event) => { event.preventDefault(); article.classList.remove("drop-before"); if (state.dragging && state.dragging !== task.id) void moveTask(state.dragging, task.status, task.id); });
+  article.addEventListener("drop", (event) => { event.preventDefault(); event.stopPropagation(); article.classList.remove("drop-before"); if (state.dragging && state.dragging !== task.id) void moveTask(state.dragging, task.status, task.id); });
   const body = node("div","card-body");
   body.append(node("div","card-title",task.title));
   if (task.description) body.append(node("div","card-description",task.description));
@@ -129,10 +131,12 @@ function optimisticMove(id,status,beforeId){
   state.tasks.forEach((item)=>{if(ids.has(item.id)){const ranked=destination.find((x)=>x.id===item.id);item.status=status;item.position=ranked.position;}}); render();
 }
 async function moveTask(id,status,beforeId){
+  if(state.moving){message("A move is already saving");return;}
   const task=taskById(id); if(!task || (task.status===status && beforeId===id))return;
-  const snapshot=structuredClone(state.tasks); optimisticMove(id,status,beforeId); message("Saving move…");
+  state.moving=true;const snapshot=structuredClone(state.tasks); optimisticMove(id,status,beforeId); message("Saving move…");
   try{await request(`/tasks/${encodeURIComponent(id)}/move`,{method:"POST",body:JSON.stringify({destination_status:status,before_id:beforeId,expected_version:task.version})});await load({quiet:true});message("Move saved");}
   catch(error){state.tasks=snapshot;render();message(`${error.message}. Board reloaded.`,true);await load({quiet:true});}
+  finally{state.moving=false;render();}
 }
 function openDialog(task=null){
   document.getElementById("dialog-title").textContent=task?"Edit task":"New task";document.getElementById("task-id").value=task?.id||"";document.getElementById("task-version").value=task?.version||"";document.getElementById("task-title").value=task?.title||"";document.getElementById("task-description").value=task?.description||"";document.getElementById("task-status").value=task?.status||"open";document.getElementById("task-priority").value=String(task?.priority??2);document.getElementById("task-type").value=task?.issue_type||"task";document.getElementById("task-assignee").value=task?.assignee||"";dialog.showModal();document.getElementById("task-title").focus();

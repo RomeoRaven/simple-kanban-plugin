@@ -30,6 +30,8 @@ def test_view_is_single_slug_aware_page(plugin):
     assert "{{JS}}" not in html
     assert "http://localhost" not in html
     assert "Authorization" not in html
+    assert "event.stopPropagation()" in html
+    assert "moving:false" in html
 
 
 def test_event_is_namespaced_by_registry(plugin, registry, tmp_path):

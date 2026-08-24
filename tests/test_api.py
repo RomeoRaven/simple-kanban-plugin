@@ -56,3 +56,11 @@ def test_api_requires_version_and_valid_fields(plugin, tmp_path):
         ).status_code
         == 422
     )
+    for suffix in ("", "/move", "/close", "/reopen"):
+        method = client.patch if not suffix else client.post
+        payload: dict[str, object] = {"expected_version": "old"}
+        if suffix == "/move":
+            payload.update({"destination_status": "blocked", "before_id": None})
+        if not suffix:
+            payload["title"] = "Changed"
+        assert method(f"/api/plugins/simple_kanban/tasks/{task['id']}{suffix}", json=payload).status_code == 422

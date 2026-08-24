@@ -73,6 +73,20 @@ def _priority(value: Any) -> int:
     return priority
 
 
+def _version(value: Any) -> int:
+    if isinstance(value, bool):
+        raise KanbanValidation("expected_version must be a positive integer")
+    if isinstance(value, int):
+        version = value
+    elif isinstance(value, str) and value.isdigit():
+        version = int(value)
+    else:
+        raise KanbanValidation("expected_version must be a positive integer")
+    if version < 1:
+        raise KanbanValidation("expected_version must be a positive integer")
+    return version
+
+
 def _issue_type(value: Any) -> str:
     issue_type = _text(value or "task", "issue_type", required=True, limit=40)
     if issue_type not in ISSUE_TYPES:
@@ -250,9 +264,10 @@ class KanbanStore:
         unknown = sorted(set(fields) - allowed)
         if unknown:
             raise KanbanValidation(f"unsupported field {unknown[0]}")
+        expected_version = _version(expected_version)
         with self._write() as conn:
             current = self._row(conn.execute("SELECT * FROM kanban_tasks WHERE id=?", (task_id,)).fetchone())
-            if int(current["version"]) != int(expected_version):
+            if int(current["version"]) != expected_version:
                 raise KanbanConflict("task changed; reload and try again")
             values: dict[str, Any] = {}
             if "title" in fields:
@@ -285,9 +300,10 @@ class KanbanStore:
     ) -> dict[str, Any]:
         destination_status = _status(destination_status)
         before_id = _text(before_id, "before_id", limit=100) or None
+        expected_version = _version(expected_version)
         with self._write() as conn:
             current = self._row(conn.execute("SELECT * FROM kanban_tasks WHERE id=?", (task_id,)).fetchone())
-            if int(current["version"]) != int(expected_version):
+            if int(current["version"]) != expected_version:
                 raise KanbanConflict("task changed; reload and try again")
             source_status = str(current["status"])
             source_ids = self._ordered_ids(conn, source_status, without=task_id)
@@ -299,7 +315,14 @@ class KanbanStore:
             else:
                 destination_ids.append(task_id)
             now = _now()
-            closing = destination_status == "closed"
+            entering_closed = destination_status == "closed" and source_status != "closed"
+            leaving_closed = destination_status != "closed" and source_status == "closed"
+            closed_at = now if entering_closed else (None if leaving_closed else current["closed_at"])
+            reason = (
+                _text(close_reason, "close_reason", limit=1000)
+                if entering_closed
+                else (None if leaving_closed else current["close_reason"])
+            )
             conn.execute(
                 """UPDATE kanban_tasks
                    SET status=?, version=version+1, updated_at=?, closed_at=?, close_reason=?
@@ -307,8 +330,8 @@ class KanbanStore:
                 (
                     destination_status,
                     now,
-                    now if closing else None,
-                    _text(close_reason, "close_reason", limit=1000) if closing else None,
+                    closed_at,
+                    reason,
                     task_id,
                 ),
             )
@@ -330,9 +353,10 @@ class KanbanStore:
         return self.move(task_id, destination_status="open", before_id=None, expected_version=expected_version)
 
     def delete(self, task_id: str, *, expected_version: int) -> dict[str, Any]:
+        expected_version = _version(expected_version)
         with self._write() as conn:
             current = self._row(conn.execute("SELECT * FROM kanban_tasks WHERE id=?", (task_id,)).fetchone())
-            if int(current["version"]) != int(expected_version):
+            if int(current["version"]) != expected_version:
                 raise KanbanConflict("task changed; reload and try again")
             conn.execute("DELETE FROM kanban_tasks WHERE id=?", (task_id,))
             self._renumber(conn, str(current["status"]), self._ordered_ids(conn, str(current["status"])))
