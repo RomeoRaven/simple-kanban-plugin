@@ -40,6 +40,8 @@ def test_view_is_single_slug_aware_page(plugin):
     assert 'form.querySelectorAll("input,textarea,select,button")' in html
     assert "const column=rankedTasks(task.status)" in html
     assert "generation!==loadGeneration" in html
+    assert "required?load({quiet,required}):false" in html
+    assert "required:true" in html
     assert 'if(state.moving){message("A task change is already saving")' in html
 
 

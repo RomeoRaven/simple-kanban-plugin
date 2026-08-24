@@ -119,10 +119,10 @@ function render() {
   document.getElementById("board-mode").setAttribute("aria-pressed",String(state.mode==="board"));
   document.getElementById("list-mode").setAttribute("aria-pressed",String(state.mode==="list"));
 }
-async function load({quiet=false}={}) {
+async function load({quiet=false,required=false}={}) {
   const generation=++loadGeneration;
-  try { const data=await request("/tasks");if(generation!==loadGeneration)return;state.tasks=data.tasks;render();if(!quiet)message(`${state.tasks.length} task${state.tasks.length===1?"":"s"}`); }
-  catch(error){if(generation!==loadGeneration)return;content.replaceChildren(node("div","global-empty","Kanban could not load."));content.setAttribute("aria-busy","false");message(`Load failed: ${error.message}`,true);}
+  try { const data=await request("/tasks");if(generation!==loadGeneration)return required?load({quiet,required}):false;state.tasks=data.tasks;render();if(!quiet)message(`${state.tasks.length} task${state.tasks.length===1?"":"s"}`);return true; }
+  catch(error){if(generation!==loadGeneration)return required?load({quiet,required}):false;content.replaceChildren(node("div","global-empty","Kanban could not load."));content.setAttribute("aria-busy","false");message(`Load failed: ${error.message}`,true);if(required)throw error;return false;}
 }
 function optimisticMove(id,status,beforeId){
   const task=taskById(id); if(!task)return;
@@ -136,9 +136,9 @@ function optimisticMove(id,status,beforeId){
 async function moveTask(id,status,beforeId){
   if(state.moving){message("A move is already saving");return;}
   const task=taskById(id); if(!task || (task.status===status && beforeId===id))return;
-  state.moving=true;const snapshot=structuredClone(state.tasks); optimisticMove(id,status,beforeId); message("Saving move…");
-  try{await request(`/tasks/${encodeURIComponent(id)}/move`,{method:"POST",body:JSON.stringify({destination_status:status,before_id:beforeId,expected_version:task.version})});await load({quiet:true});message("Move saved");}
-  catch(error){state.tasks=snapshot;render();message(`${error.message}. Board reloaded.`,true);await load({quiet:true});}
+  state.moving=true;const snapshot=structuredClone(state.tasks);let moved=false;optimisticMove(id,status,beforeId);message("Saving move…");
+  try{await request(`/tasks/${encodeURIComponent(id)}/move`,{method:"POST",body:JSON.stringify({destination_status:status,before_id:beforeId,expected_version:task.version})});moved=true;await load({quiet:true,required:true});message("Move saved");}
+  catch(error){if(!moved){state.tasks=snapshot;render();}try{await load({quiet:true,required:true});message(moved?"Move saved after refresh retry":`${error.message}. Board reloaded.`,!moved);}catch{message(moved?`Move saved, but refresh failed: ${error.message}`:`${error.message}. Board reload failed.`,true);}}
   finally{state.moving=false;render();}
 }
 function openDialog(task=null){
@@ -148,24 +148,24 @@ function openDialog(task=null){
 function setDialogSaving(saving){state.saving=saving;form.querySelectorAll("input,textarea,select,button").forEach((element)=>{element.disabled=saving;});document.getElementById("cancel-x").disabled=saving;}
 async function saveTask(event){
   event.preventDefault();if(state.saving)return;const id=document.getElementById("task-id").value;const payload={title:document.getElementById("task-title").value,description:document.getElementById("task-description").value,status:document.getElementById("task-status").value,priority:Number(document.getElementById("task-priority").value),issue_type:document.getElementById("task-type").value,assignee:document.getElementById("task-assignee").value};const capturedVersion=Number(document.getElementById("task-version").value);setDialogSaving(true);
-  try{
+  let saved=false;try{
     if(id){const current=taskById(id);const desiredStatus=payload.status;delete payload.status;if(current.status!==desiredStatus)await request(`/tasks/${encodeURIComponent(id)}/move`,{method:"POST",body:JSON.stringify({destination_status:desiredStatus,before_id:null,expected_version:capturedVersion,updates:payload})});else await request(`/tasks/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify({...payload,expected_version:capturedVersion})});}
     else await request("/tasks",{method:"POST",body:JSON.stringify(payload)});
-    dialog.close();await load({quiet:true});message(id?"Task updated":"Task created");
-  }catch(error){message(`Save failed: ${error.message}`,true);}finally{setDialogSaving(false);}
+    saved=true;dialog.close();await load({quiet:true,required:true});message(id?"Task updated":"Task created");
+  }catch(error){if(saved){try{await load({quiet:true,required:true});message(id?"Task updated after refresh retry":"Task created after refresh retry");}catch{message(`Task saved, but refresh failed: ${error.message}`,true);}}else message(`Save failed: ${error.message}`,true);}finally{setDialogSaving(false);}
 }
 async function simpleAction(task,action){
   if(action==="edit"){openDialog(task);return;}
   if(action==="earlier"||action==="later"){const column=rankedTasks(task.status);const index=column.findIndex((x)=>x.id===task.id);let before=null;if(action==="earlier"&&index>0)before=column[index-1].id;else if(action==="later"&&index<column.length-1)before=column[index+2]?.id||null;else return;await moveTask(task.id,task.status,before);return;}
   if(state.moving){message("A task change is already saving");return;}
   if(action==="delete"&&!confirm(`Delete “${task.title}”?`))return;
-  state.moving=true;render();message("Saving change…");
+  state.moving=true;let applied=false;render();message("Saving change…");
   try{
     if(action==="close")await request(`/tasks/${encodeURIComponent(task.id)}/close`,{method:"POST",body:JSON.stringify({expected_version:task.version,reason:"Closed from Kanban"})});
     if(action==="reopen")await request(`/tasks/${encodeURIComponent(task.id)}/reopen`,{method:"POST",body:JSON.stringify({expected_version:task.version})});
     if(action==="delete")await request(`/tasks/${encodeURIComponent(task.id)}?expected_version=${task.version}`,{method:"DELETE"});
-    await load({quiet:true});message(action==="delete"?"Task deleted":"Task updated");
-  }catch(error){message(`${action} failed: ${error.message}`,true);await load({quiet:true});}
+    applied=true;await load({quiet:true,required:true});message(action==="delete"?"Task deleted":"Task updated");
+  }catch(error){if(applied){try{await load({quiet:true,required:true});message(action==="delete"?"Task deleted after refresh retry":"Task updated after refresh retry");}catch{message(`Task changed, but refresh failed: ${error.message}`,true);}}else{message(`${action} failed: ${error.message}`,true);try{await load({quiet:true,required:true});}catch{}}}
   finally{state.moving=false;render();}
 }
 function subscribeToChanges(){
