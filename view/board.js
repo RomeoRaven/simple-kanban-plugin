@@ -56,7 +56,7 @@ function statusSelect(task) {
   return select;
 }
 function actionButton(label, action, title=label) {
-  const button = node("button", "", label); button.type="button"; button.dataset.action=action; button.title=title; button.disabled=state.moving; return button;
+  const button=node("button","",label);button.type="button";button.dataset.action=action;button.title=title;button.setAttribute("aria-label",title);button.disabled=state.moving;return button;
 }
 function card(task) {
   const article = node("article", "card"); article.dataset.id=task.id; article.draggable=!state.moving;
@@ -109,7 +109,7 @@ function renderList() {
     const row=node("tr"); row.dataset.id=task.id;
     row.append(node("td","",String(task.position)),node("td","list-title",task.title));
     const s=node("td");s.append(statusSelect(task));row.append(s,node("td",`priority-${task.priority}`,PRIORITIES[task.priority]),node("td","",task.issue_type),node("td","",task.assignee||"—"));
-    const actions=node("td","list-actions");actions.append(actionButton("←","earlier"),actionButton("→","later"),actionButton("Edit","edit"),actionButton(task.status==="closed"?"Reopen":"Close",task.status==="closed"?"reopen":"close"));row.append(actions);tbody.append(row);
+    const actions=node("td","list-actions");actions.append(actionButton("←","earlier","Move earlier"),actionButton("→","later","Move later"),actionButton("Edit","edit"),actionButton(task.status==="closed"?"Reopen":"Close",task.status==="closed"?"reopen":"close"));row.append(actions);tbody.append(row);
   }
   if(!filteredTasks().length){const row=node("tr");const cell=node("td","global-empty","No matching tasks");cell.colSpan=7;row.append(cell);tbody.append(row);}
   table.append(tbody);wrap.append(table);return wrap;

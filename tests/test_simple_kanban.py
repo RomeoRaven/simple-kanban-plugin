@@ -57,6 +57,8 @@ def test_view_is_single_slug_aware_page(plugin):
     assert "(!dialog.open||state.needsRefresh)" in html
     assert "loaded:false" in html
     assert "if(required||!state.loaded)" in html
+    assert 'setAttribute("aria-label",title)' in html
+    assert 'actionButton("←","earlier","Move earlier")' in html
     assert (
         "filteredTasks().sort((a,b)=>STATUSES.indexOf(a.status)-STATUSES.indexOf(b.status)||a.position-b.position)"
         in html
