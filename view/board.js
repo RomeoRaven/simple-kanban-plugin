@@ -142,17 +142,17 @@ async function moveTask(id,status,beforeId){
   finally{state.moving=false;render();}
 }
 function openDialog(task=null){
-  if(state.saving)return;
+  if(state.saving||state.moving)return;
   document.getElementById("dialog-title").textContent=task?"Edit task":"New task";document.getElementById("task-id").value=task?.id||"";document.getElementById("task-version").value=task?.version||"";document.getElementById("task-title").value=task?.title||"";document.getElementById("task-description").value=task?.description||"";document.getElementById("task-status").value=task?.status||"open";document.getElementById("task-priority").value=String(task?.priority??2);document.getElementById("task-type").value=task?.issue_type||"task";document.getElementById("task-assignee").value=task?.assignee||"";dialog.showModal();document.getElementById("task-title").focus();
 }
 function setDialogSaving(saving){state.saving=saving;form.querySelectorAll("input,textarea,select,button").forEach((element)=>{element.disabled=saving;});document.getElementById("cancel-x").disabled=saving;}
 async function saveTask(event){
-  event.preventDefault();if(state.saving)return;const id=document.getElementById("task-id").value;const payload={title:document.getElementById("task-title").value,description:document.getElementById("task-description").value,status:document.getElementById("task-status").value,priority:Number(document.getElementById("task-priority").value),issue_type:document.getElementById("task-type").value,assignee:document.getElementById("task-assignee").value};const capturedVersion=Number(document.getElementById("task-version").value);setDialogSaving(true);
+  event.preventDefault();if(state.saving||state.moving)return;const id=document.getElementById("task-id").value;const payload={title:document.getElementById("task-title").value,description:document.getElementById("task-description").value,status:document.getElementById("task-status").value,priority:Number(document.getElementById("task-priority").value),issue_type:document.getElementById("task-type").value,assignee:document.getElementById("task-assignee").value};const capturedVersion=Number(document.getElementById("task-version").value);state.moving=true;render();setDialogSaving(true);
   let saved=false;try{
     if(id){const current=taskById(id);const desiredStatus=payload.status;delete payload.status;if(current.status!==desiredStatus)await request(`/tasks/${encodeURIComponent(id)}/move`,{method:"POST",body:JSON.stringify({destination_status:desiredStatus,before_id:null,expected_version:capturedVersion,updates:payload})});else await request(`/tasks/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify({...payload,expected_version:capturedVersion})});}
     else await request("/tasks",{method:"POST",body:JSON.stringify(payload)});
     saved=true;dialog.close();await load({quiet:true,required:true});message(id?"Task updated":"Task created");
-  }catch(error){if(saved){try{await load({quiet:true,required:true});message(id?"Task updated after refresh retry":"Task created after refresh retry");}catch{message(`Task saved, but refresh failed: ${error.message}`,true);}}else message(`Save failed: ${error.message}`,true);}finally{setDialogSaving(false);}
+  }catch(error){if(saved){try{await load({quiet:true,required:true});message(id?"Task updated after refresh retry":"Task created after refresh retry");}catch{message(`Task saved, but refresh failed: ${error.message}`,true);}}else message(`Save failed: ${error.message}`,true);}finally{setDialogSaving(false);state.moving=false;render();}
 }
 async function simpleAction(task,action){
   if(action==="edit"){openDialog(task);return;}

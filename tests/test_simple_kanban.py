@@ -44,6 +44,8 @@ def test_view_is_single_slug_aware_page(plugin):
     assert "required:true" in html
     assert 'if(state.moving){message("A task change is already saving")' in html
     assert "color-scheme:light dark" in html
+    assert "if(state.saving||state.moving)return" in html
+    assert "state.moving=true;render();setDialogSaving(true)" in html
     assert (
         "filteredTasks().sort((a,b)=>STATUSES.indexOf(a.status)-STATUSES.indexOf(b.status)||a.position-b.position)"
         in html

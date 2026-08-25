@@ -75,7 +75,7 @@ def _priority(value: Any) -> int:
         raise KanbanValidation("priority must be an integer from 0 to 4")
     if isinstance(value, int):
         priority = value
-    elif isinstance(value, str) and value.isdigit():
+    elif isinstance(value, str) and value.isascii() and value.isdigit():
         priority = int(value)
     else:
         raise KanbanValidation("priority must be an integer from 0 to 4")
@@ -89,7 +89,7 @@ def _version(value: Any) -> int:
         raise KanbanValidation("expected_version must be a positive integer")
     if isinstance(value, int):
         version = value
-    elif isinstance(value, str) and value.isdigit():
+    elif isinstance(value, str) and value.isascii() and value.isdigit():
         version = int(value)
     else:
         raise KanbanValidation("expected_version must be a positive integer")

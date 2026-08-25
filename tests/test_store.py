@@ -93,6 +93,8 @@ def test_malformed_versions_are_validation_errors(plugin, tmp_path):
     for operation in operations:
         with pytest.raises(module.KanbanValidation, match="positive integer"):
             operation()
+    with pytest.raises(module.KanbanValidation, match="positive integer"):
+        store.update(task["id"], expected_version="²", title="Changed")
     assert store.get(task["id"])["version"] == 1
 
 
@@ -108,7 +110,7 @@ def test_validation_and_source_idempotency(plugin, tmp_path):
     for issue_type in ("", None):
         with pytest.raises(module.KanbanValidation, match="issue_type is required"):
             store.create(title="Bad type", issue_type=issue_type)
-    for priority in (True, 1.9):
+    for priority in (True, 1.9, "²"):
         with pytest.raises(module.KanbanValidation, match="priority must be an integer"):
             store.create(title="Bad priority", priority=priority)
     one = store.create(title="Imported", source_kind="test", source_id="1")
