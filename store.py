@@ -250,10 +250,21 @@ class KanbanStore:
         return [dict(row) for row in rows]
 
     def get(self, task_id: str) -> dict[str, Any]:
+        supplied = _text(task_id, "id", required=True)
         with self._connect() as conn:
-            return self._row(
-                conn.execute("SELECT * FROM kanban_tasks WHERE id=?", (_text(task_id, "id", required=True),)).fetchone()
-            )
+            row = conn.execute("SELECT * FROM kanban_tasks WHERE id=?", (supplied,)).fetchone()
+            compact = supplied.upper()
+            if row is None and len(compact) == 10 and compact.startswith("K-") and all(
+                character in "0123456789ABCDEF" for character in compact[2:]
+            ):
+                matches = conn.execute(
+                    "SELECT * FROM kanban_tasks WHERE id LIKE ? ORDER BY id LIMIT 2",
+                    (f"kanban-{compact[2:].lower()}%",),
+                ).fetchall()
+                if len(matches) > 1:
+                    raise KanbanConflict("compact card_id is ambiguous; copy and use the full card_id")
+                row = matches[0] if matches else None
+            return self._row(row)
 
     def create(
         self,

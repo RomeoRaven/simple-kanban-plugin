@@ -69,7 +69,13 @@ def test_view_is_single_slug_aware_page(plugin):
     assert "rankCapabilities(task)" in html
     assert "rank-badge" in html
     assert ".icon-button svg" in html
-    assert "card_id: ${task.id}" in html
+    assert 'node("code","card-id",`card_id: ${task.id}`)' not in html
+    assert 'return `K-${cardId.replace(/^kanban-/i,"").slice(0,8).toUpperCase()}`' in html
+    assert "Copy full card_id ${shortId}" in html
+    assert "copy.dataset.copyId=task.id" in html
+    assert "navigator.clipboard?.writeText" in html
+    assert 'document.execCommand("copy")' in html
+    assert "cardIdCell.append(cardIdControl(task))" in html
     assert 'localStorage.getItem("simple-kanban.collapsed")' in html
     assert 'localStorage.setItem("simple-kanban.collapsed"' in html
     assert "writing-mode:vertical-rl" in html

@@ -71,7 +71,7 @@ Default statuses: `open`, `in_progress`, `blocked`, `deferred`, `closed`.
 - Optimistic UI serializes local moves, rolls back failures, explains conflicts, and reloads authoritative state.
 - Cards, buttons, menus, and board scrolling remain usable while drag is enabled.
 - Every vertical status column can collapse to a slim persisted rail without changing card state.
-- Every card displays its exact durable `card_id`; agents can resolve that ID directly.
+- Every card displays a compact `K-XXXXXXXX` reference beside a copy control for the exact durable `card_id`; agents can resolve either a unique compact reference or the copied full ID directly.
 
 ## Self-reliant architecture
 

@@ -12,7 +12,7 @@ Status: **v0.1.0 development candidate**. Linux source qualification is complete
 - Individually collapsible vertical status columns with the layout preference retained in the browser.
 - Drag/drop plus status selectors and earlier/later controls for keyboard, screen-reader, and mobile fallback.
 - Create, edit, move, close, reopen, and delete controls.
-- Exact, small `card_id` labels on cards and in List mode for direct agent lookup.
+- Compact `K-XXXXXXXX` card references with one-click copy of the complete durable `card_id`; either form supports direct agent lookup when unique.
 - Non-destructive **Archive all** for Closed cards with an explicit second-click confirmation plus a read-only Archived view.
 - Search, optimistic move display, stale-write conflict detection, rollback, and authoritative refresh.
 - Eight namespaced agent tools, including exact-card lookup and bulk Closed archival.

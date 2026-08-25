@@ -10,7 +10,7 @@ Use the `simple_kanban_*` tools when the operator wants a lightweight ranked wor
 ## Rules
 
 - List first when an existing task might already represent the work.
-- When the operator supplies a visible `card_id`, call `simple_kanban_task_get` rather than guessing from titles.
+- When the operator supplies a visible compact `K-XXXXXXXX` reference or a copied full `card_id`, call `simple_kanban_task_get` rather than guessing from titles. A compact collision is rejected instead of guessed.
 - Preserve the returned `version`; pass it as `expected_version` on every update, move, close, or delete.
 - Treat `priority` as importance and the server-owned per-status position as manual rank. Never emulate rank by changing priority.
 - Use `simple_kanban_task_move` for both same-column reorder and cross-column status changes. Leave `before_id` blank to append.

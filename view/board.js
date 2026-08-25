@@ -13,6 +13,7 @@ const ICON_PATHS = {
   delete:["M3 6h18","M8 6V4h8v2","M19 6l-1 14H6L5 6","M10 11v5","M14 11v5"],
   archive:["M3 6h18","M5 6v14h14V6","M9 10h6","M4 3h16v3"],
   collapse:["m15 18-6-6 6-6"], expand:["m9 18 6-6-6-6"],
+  copy:["M8 8h11v11H8Z","M5 16H4V4h12v1"],
 };
 function savedCollapsed() {
   try { return new Set(JSON.parse(localStorage.getItem("simple-kanban.collapsed") || "[]").filter((status)=>STATUSES.includes(status))); }
@@ -77,6 +78,16 @@ function actionButton(action, title, iconName, disabled=false) {
 function iconButton(title, iconName, disabled=false) {
   const button=node("button","icon-button");button.type="button";button.title=title;button.setAttribute("aria-label",title);button.disabled=state.moving||disabled;button.append(icon(iconName));return button;
 }
+function compactCardId(cardId) { return `K-${cardId.replace(/^kanban-/i,"").slice(0,8).toUpperCase()}`; }
+function cardIdControl(task) {
+  const row=node("div","card-id-row");const shortId=compactCardId(task.id);const value=node("code","card-id",shortId);value.title=`Full card_id: ${task.id}`;value.setAttribute("aria-label",`Card ID ${shortId}`);const copy=iconButton(`Copy full card_id ${shortId}`,"copy");copy.classList.add("copy-card-id");copy.dataset.copyId=task.id;row.append(value,copy);return row;
+}
+async function copyCardId(cardId) {
+  let copied=false;
+  try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(cardId);copied=true;}}catch{/* fallback below */}
+  if(!copied){const field=node("textarea","copy-fallback",cardId);field.setAttribute("aria-hidden","true");document.body.append(field);field.select();copied=document.execCommand("copy");field.remove();}
+  message(copied?`Copied full card_id ${compactCardId(cardId)}`:"Could not copy card_id",!copied);
+}
 function toggleColumn(status) {
   if(state.collapsed.has(status))state.collapsed.delete(status);else state.collapsed.add(status);
   localStorage.setItem("simple-kanban.collapsed",JSON.stringify([...state.collapsed]));render();
@@ -99,7 +110,7 @@ function card(task) {
   article.addEventListener("dragleave", () => article.classList.remove("drop-before"));
   article.addEventListener("drop", (event) => { event.preventDefault(); event.stopPropagation(); article.classList.remove("drop-before"); if (state.dragging && state.dragging !== task.id) void moveTask(state.dragging, task.status, task.id); });
   const body = node("div","card-body");
-  const cardId=node("code","card-id",`card_id: ${task.id}`);cardId.title=`Card ID: ${task.id}`;cardId.setAttribute("aria-label",cardId.title);body.append(cardId);
+  body.append(cardIdControl(task));
   body.append(node("div","card-title",task.title));
   if (task.description) body.append(node("div","card-description",task.description));
   const meta=node("div","meta");const rank=node("span","badge rank-badge",`#${task.position}`);rank.title=`Rank ${task.position} in ${LABELS[task.status]}`;rank.setAttribute("aria-label",rank.title);meta.append(rank);
@@ -136,7 +147,7 @@ function renderList() {
   const tbody=node("tbody");
   for(const task of filteredTasks().sort((a,b)=>STATUSES.indexOf(a.status)-STATUSES.indexOf(b.status)||a.position-b.position)){
     const row=node("tr"); row.dataset.id=task.id;
-    row.append(node("td","",String(task.position)),node("td","card-id",task.id),node("td","list-title",task.title));
+    const cardIdCell=node("td","");cardIdCell.append(cardIdControl(task));row.append(node("td","",String(task.position)),cardIdCell,node("td","list-title",task.title));
     const s=node("td");s.append(statusSelect(task));row.append(s,node("td",`priority-${task.priority}`,PRIORITIES[task.priority]),node("td","",task.issue_type),node("td","",task.assignee||"—"));
     const capability=rankCapabilities(task);const actions=node("td","list-actions");actions.append(actionButton("earlier",capability.earlier?"Move up":"Already first in column","up",!capability.earlier),actionButton("later",capability.later?"Move down":"Already last in column","down",!capability.later),actionButton("edit","Edit task","edit"),task.status==="closed"?actionButton("reopen","Reopen task","reopen"):actionButton("close","Close task","close"),actionButton("delete","Delete task","delete"));row.append(actions);tbody.append(row);
   }
@@ -145,7 +156,7 @@ function renderList() {
 }
 function renderArchived() {
   const wrap=node("div","list-wrap archived-wrap");const table=node("table","list archived-list");const thead=node("thead");const heading=node("tr");["Card ID","Task","Closed","Archived"].forEach((label)=>heading.append(node("th","",label)));thead.append(heading);table.append(thead);const tbody=node("tbody");
-  for(const task of filteredTasks()){const row=node("tr");row.dataset.id=task.id;row.append(node("td","card-id",task.id),node("td","list-title",task.title),node("td","",task.closed_at?new Date(task.closed_at).toLocaleString():"—"),node("td","",new Date(task.archived_at).toLocaleString()));tbody.append(row);}
+  for(const task of filteredTasks()){const row=node("tr");row.dataset.id=task.id;const cardIdCell=node("td","");cardIdCell.append(cardIdControl(task));row.append(cardIdCell,node("td","list-title",task.title),node("td","",task.closed_at?new Date(task.closed_at).toLocaleString():"—"),node("td","",new Date(task.archived_at).toLocaleString()));tbody.append(row);}
   if(!filteredTasks().length){const row=node("tr");const cell=node("td","global-empty","No archived cards");cell.colSpan=4;row.append(cell);tbody.append(row);}table.append(tbody);wrap.append(table);return wrap;
 }
 function render() {
@@ -217,7 +228,7 @@ function subscribeToChanges(){
   window.addEventListener("message",(event)=>{if(event.source===window.parent&&event.data?.type==="protoagent:event"&&event.data.topic==="simple_kanban.changed")void load({quiet:true});});
   if(window.parent!==window)window.parent.postMessage({type:"protoagent:subscribe",patterns:["simple_kanban.changed"]},"*");
 }
-content.addEventListener("click",(event)=>{const button=event.target.closest("button[data-action]");if(!button)return;const owner=button.closest("[data-id]");const task=taskById(owner?.dataset.id);if(task)void simpleAction(task,button.dataset.action);});
+content.addEventListener("click",(event)=>{const copy=event.target.closest("button[data-copy-id]");if(copy){void copyCardId(copy.dataset.copyId);return;}const button=event.target.closest("button[data-action]");if(!button)return;const owner=button.closest("[data-id]");const task=taskById(owner?.dataset.id);if(task)void simpleAction(task,button.dataset.action);});
 for(const status of STATUSES){const option=node("option","",LABELS[status]);option.value=status;document.getElementById("task-status").append(option);}
 document.getElementById("add-task").addEventListener("click",()=>openDialog());document.getElementById("refresh").addEventListener("click",()=>void load());document.getElementById("show-archive").addEventListener("click",()=>void toggleArchive());document.getElementById("board-mode").addEventListener("click",()=>{state.mode="board";localStorage.setItem("simple-kanban.mode",state.mode);render();});document.getElementById("list-mode").addEventListener("click",()=>{state.mode="list";localStorage.setItem("simple-kanban.mode",state.mode);render();});document.getElementById("search").addEventListener("input",(event)=>{state.query=event.target.value;render();});document.getElementById("cancel").addEventListener("click",()=>{if(!state.saving)dialog.close();});document.getElementById("cancel-x").addEventListener("click",()=>{if(!state.saving)dialog.close();});dialog.addEventListener("cancel",(event)=>{if(state.saving)event.preventDefault();});form.addEventListener("submit",saveTask);window.addEventListener("focus",()=>void load({quiet:true}));subscribeToChanges();setInterval(()=>{if(document.visibilityState==="visible"&&(!dialog.open||state.needsRefresh))void load({quiet:true});},15000);
 await load();

@@ -67,6 +67,20 @@ def test_stale_writes_conflict_without_mutation(plugin, tmp_path):
     assert store.get(task["id"])["version"] == newer["version"]
 
 
+def test_compact_card_id_resolves_uniquely_and_rejects_ambiguity(plugin, tmp_path):
+    store, module = _store(plugin, tmp_path)
+    task = store.create(title="Compact reference")
+    compact = f"K-{task['id'].removeprefix('kanban-')[:8].upper()}"
+    assert store.get(compact)["id"] == task["id"]
+
+    other = store.create(title="Collision probe")
+    with sqlite3.connect(store.path) as conn:
+        conn.execute("UPDATE kanban_tasks SET id=? WHERE id=?", ("kanban-aaaaaaaa0001", task["id"]))
+        conn.execute("UPDATE kanban_tasks SET id=? WHERE id=?", ("kanban-aaaaaaaa0002", other["id"]))
+    with pytest.raises(module.KanbanConflict, match="ambiguous"):
+        store.get("K-AAAAAAAA")
+
+
 def test_closed_reorder_preserves_terminal_metadata(plugin, tmp_path):
     store, _ = _store(plugin, tmp_path)
     first = store.create(title="First")
