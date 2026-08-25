@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import sqlite3
 import sys
 import types
 from concurrent.futures import ThreadPoolExecutor
@@ -81,6 +82,45 @@ def test_closed_reorder_preserves_terminal_metadata(plugin, tmp_path):
     assert reordered["close_reason"] == "accepted"
 
 
+def test_archive_closed_is_durable_non_destructive_and_idempotent(plugin, tmp_path):
+    store, module = _store(plugin, tmp_path)
+    active = store.create(title="Still active")
+    first = store.create(title="Closed one", status="closed")
+    second = store.create(title="Closed two", status="closed")
+
+    archived = store.archive_closed()
+    assert [task["id"] for task in archived] == [first["id"], second["id"]]
+    assert all(task["archived_at"] and task["version"] == 2 for task in archived)
+    assert [task["id"] for task in store.list()] == [active["id"]]
+    assert [task["id"] for task in store.list(archived=True)] == [first["id"], second["id"]]
+    assert store.get(first["id"])["title"] == "Closed one"
+    assert store.archive_closed() == []
+    with pytest.raises(module.KanbanValidation, match="read-only"):
+        store.update(first["id"], expected_version=2, title="No")
+    with pytest.raises(module.KanbanValidation, match="cannot be moved"):
+        store.reopen(first["id"], expected_version=2)
+    assert store.integrity() == "ok"
+
+
+def test_schema_migrates_existing_database_to_archive_column(plugin, tmp_path):
+    module = importlib.import_module(plugin.__name__ + ".store")
+    path = tmp_path / "legacy.db"
+    with sqlite3.connect(path) as conn:
+        conn.execute(
+            """CREATE TABLE kanban_tasks (
+            id TEXT PRIMARY KEY,title TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL,position INTEGER NOT NULL,version INTEGER NOT NULL DEFAULT 1,
+            priority INTEGER NOT NULL DEFAULT 2,issue_type TEXT NOT NULL DEFAULT 'task',
+            assignee TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL,
+            closed_at TEXT,close_reason TEXT,source_kind TEXT,source_id TEXT)"""
+        )
+    store = module.KanbanStore(path)
+    created = store.create(title="Migrated")
+    assert created["archived_at"] is None
+    with sqlite3.connect(path) as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
+
+
 def test_malformed_versions_are_validation_errors(plugin, tmp_path):
     store, module = _store(plugin, tmp_path)
     task = store.create(title="Guarded")
@@ -128,6 +168,21 @@ def test_concurrent_creates_have_dense_unique_rank(plugin, tmp_path):
     assert sorted(task["position"] for task in tasks) == list(range(1, 41))
     assert len({task["id"] for task in tasks}) == 40
     assert store.integrity() == "ok"
+
+
+def test_concurrent_bulk_archive_has_one_atomic_winner(plugin, tmp_path):
+    module = importlib.import_module(plugin.__name__ + ".store")
+    path = tmp_path / "archive.db"
+    first = module.KanbanStore(path)
+    second = module.KanbanStore(path)
+    for index in range(20):
+        first.create(title=f"Closed {index}", status="closed")
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        counts = list(pool.map(lambda store: len(store.archive_closed()), (first, second)))
+    assert sorted(counts) == [0, 20]
+    assert first.list() == []
+    assert len(first.list(archived=True)) == 20
+    assert first.integrity() == "ok"
 
 
 def test_distinct_stores_coordinate_first_schema_use(plugin, tmp_path):

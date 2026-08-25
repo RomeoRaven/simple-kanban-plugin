@@ -38,11 +38,14 @@ def build_data_router():
 
     @router.get("/status")
     def status():
-        return {"plugin": "simple_kanban", "status": "ready", "schema": 1, "integrity": store().integrity()}
+        return {"plugin": "simple_kanban", "status": "ready", "schema": 2, "integrity": store().integrity()}
 
     @router.get("/tasks")
-    def list_tasks(status: Annotated[list[str] | None, Query()] = None):
-        return {"tasks": _run(lambda: store().list(status)), "statuses": list(STATUSES)}
+    def list_tasks(
+        status: Annotated[list[str] | None, Query()] = None,
+        archived: Annotated[bool, Query()] = False,
+    ):
+        return {"tasks": _run(lambda: store().list(status, archived=archived)), "statuses": list(STATUSES)}
 
     @router.get("/tasks/{task_id}")
     def get_task(task_id: str):
@@ -64,6 +67,13 @@ def build_data_router():
         )
         emit_changed("created", task)
         return {"task": task}
+
+    @router.post("/tasks/archive-closed")
+    def archive_closed_tasks():
+        tasks = _run(lambda: store().archive_closed())
+        for task in tasks:
+            emit_changed("archived", task)
+        return {"archived": len(tasks), "task_ids": [task["id"] for task in tasks]}
 
     @router.patch("/tasks/{task_id}")
     def update_task(task_id: str, payload: Annotated[dict[str, Any], Body()]):

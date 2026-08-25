@@ -47,9 +47,15 @@ def simple_kanban_task_create(
 
 
 @tool
-def simple_kanban_task_list(statuses: list[str] | None = None) -> str:
-    """List Simple Kanban tasks in the same durable ranked order shown to the operator."""
-    return _json(store().list(statuses))
+def simple_kanban_task_list(statuses: list[str] | None = None, archived: bool = False) -> str:
+    """List active or archived Simple Kanban cards in durable ranked order, including exact card IDs."""
+    return _json(store().list(statuses, archived=archived))
+
+
+@tool
+def simple_kanban_task_get(card_id: str) -> str:
+    """Get one active or archived Simple Kanban card by the exact visible card_id."""
+    return _json(store().get(card_id))
 
 
 @tool
@@ -113,11 +119,22 @@ def simple_kanban_task_delete(task_id: str, expected_version: int) -> str:
     return _json(task)
 
 
+@tool
+def simple_kanban_closed_archive() -> str:
+    """Archive every active card in Closed without deleting its durable record."""
+    tasks = store().archive_closed()
+    for task in tasks:
+        emit_changed("archived", task)
+    return _json({"archived": len(tasks), "card_ids": [task["id"] for task in tasks]})
+
+
 TOOLS = (
     simple_kanban_task_create,
     simple_kanban_task_list,
+    simple_kanban_task_get,
     simple_kanban_task_update,
     simple_kanban_task_move,
     simple_kanban_task_close,
     simple_kanban_task_delete,
+    simple_kanban_closed_archive,
 )

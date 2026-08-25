@@ -97,3 +97,25 @@ def test_api_requires_version_and_valid_fields(plugin, tmp_path):
         )
     for field, value in (("title", ["not", "text"]), ("description", {"bad": "shape"}), ("assignee", 7)):
         assert client.post("/api/plugins/simple_kanban/tasks", json={"title": "Valid", field: value}).status_code == 422
+
+
+def test_api_archives_all_closed_and_preserves_card_lookup(plugin, tmp_path):
+    client = client_for(plugin, tmp_path)
+    active = client.post("/api/plugins/simple_kanban/tasks", json={"title": "Active"}).json()["task"]
+    closed = [
+        client.post(
+            "/api/plugins/simple_kanban/tasks",
+            json={"title": f"Closed {index}", "status": "closed"},
+        ).json()["task"]
+        for index in range(2)
+    ]
+
+    archived = client.post("/api/plugins/simple_kanban/tasks/archive-closed")
+    assert archived.status_code == 200
+    assert archived.json() == {"archived": 2, "task_ids": [task["id"] for task in closed]}
+    assert [task["id"] for task in client.get("/api/plugins/simple_kanban/tasks").json()["tasks"]] == [active["id"]]
+    archived_tasks = client.get("/api/plugins/simple_kanban/tasks?archived=true").json()["tasks"]
+    assert [task["id"] for task in archived_tasks] == [task["id"] for task in closed]
+    exact = client.get(f"/api/plugins/simple_kanban/tasks/{closed[0]['id']}").json()["task"]
+    assert exact["archived_at"] and exact["id"] == closed[0]["id"]
+    assert client.post("/api/plugins/simple_kanban/tasks/archive-closed").json()["archived"] == 0

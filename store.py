@@ -168,16 +168,24 @@ class KanbanStore:
                     closed_at TEXT,
                     close_reason TEXT,
                     source_kind TEXT,
-                    source_id TEXT
+                    source_id TEXT,
+                    archived_at TEXT
                 );
                 CREATE INDEX IF NOT EXISTS idx_kanban_tasks_status_position
                     ON kanban_tasks(status, position, id);
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_kanban_tasks_source
                     ON kanban_tasks(source_kind, source_id)
                     WHERE source_kind IS NOT NULL AND source_id IS NOT NULL;
-                PRAGMA user_version=1;
                         """
                     )
+                    columns = {row["name"] for row in conn.execute("PRAGMA table_info(kanban_tasks)")}
+                    if "archived_at" not in columns:
+                        conn.execute("ALTER TABLE kanban_tasks ADD COLUMN archived_at TEXT")
+                    conn.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_kanban_tasks_archive "
+                        "ON kanban_tasks(archived_at, status, position, id)"
+                    )
+                    conn.execute("PRAGMA user_version=2")
                     self._initialized = True
                     return
                 except sqlite3.OperationalError as exc:
@@ -207,7 +215,9 @@ class KanbanStore:
     @staticmethod
     def _ordered_ids(conn: sqlite3.Connection, status: str, *, without: str | None = None) -> list[str]:
         rows = conn.execute(
-            "SELECT id FROM kanban_tasks WHERE status=? ORDER BY position, created_at, id", (status,)
+            "SELECT id FROM kanban_tasks WHERE status=? AND archived_at IS NULL "
+            "ORDER BY position, created_at, id",
+            (status,),
         ).fetchall()
         return [row["id"] for row in rows if row["id"] != without]
 
@@ -220,12 +230,19 @@ class KanbanStore:
         with self._connect() as conn:
             return str(conn.execute("PRAGMA integrity_check").fetchone()[0])
 
-    def list(self, statuses: list[str] | tuple[str, ...] | None = None) -> list[dict[str, Any]]:
+    def list(
+        self,
+        statuses: list[str] | tuple[str, ...] | None = None,
+        *,
+        archived: bool = False,
+    ) -> list[dict[str, Any]]:
         selected = tuple(_status(value) for value in (statuses or STATUSES))
         placeholders = ",".join("?" for _ in selected)
         with self._connect() as conn:
             rows = conn.execute(
-                f"SELECT * FROM kanban_tasks WHERE status IN ({placeholders}) ORDER BY CASE status "
+                f"SELECT * FROM kanban_tasks WHERE status IN ({placeholders}) AND archived_at IS "
+                + ("NOT NULL" if archived else "NULL")
+                + " ORDER BY CASE status "
                 + " ".join(f"WHEN '{status}' THEN {index}" for status, index in STATUS_INDEX.items())
                 + " END, position, created_at, id",
                 selected,
@@ -262,7 +279,11 @@ class KanbanStore:
         now = _now()
         with self._write() as conn:
             position = int(
-                conn.execute("SELECT COALESCE(MAX(position), 0) + 1 FROM kanban_tasks WHERE status=?", (status,)).fetchone()[0]
+                conn.execute(
+                    "SELECT COALESCE(MAX(position), 0) + 1 FROM kanban_tasks "
+                    "WHERE status=? AND archived_at IS NULL",
+                    (status,),
+                ).fetchone()[0]
             )
             try:
                 conn.execute(
@@ -302,6 +323,8 @@ class KanbanStore:
         expected_version = _version(expected_version)
         with self._write() as conn:
             current = self._row(conn.execute("SELECT * FROM kanban_tasks WHERE id=?", (task_id,)).fetchone())
+            if current["archived_at"]:
+                raise KanbanValidation("archived cards are read-only")
             if int(current["version"]) != expected_version:
                 raise KanbanConflict("task changed; reload and try again")
             if not values:
@@ -329,6 +352,8 @@ class KanbanStore:
         values = _edits({} if updates is None else updates)
         with self._write() as conn:
             current = self._row(conn.execute("SELECT * FROM kanban_tasks WHERE id=?", (task_id,)).fetchone())
+            if current["archived_at"]:
+                raise KanbanValidation("archived cards cannot be moved")
             if int(current["version"]) != expected_version:
                 raise KanbanConflict("task changed; reload and try again")
             source_status = str(current["status"])
@@ -382,3 +407,26 @@ class KanbanStore:
             conn.execute("DELETE FROM kanban_tasks WHERE id=?", (task_id,))
             self._renumber(conn, str(current["status"]), self._ordered_ids(conn, str(current["status"])))
             return current
+
+    def archive_closed(self) -> list[dict[str, Any]]:
+        """Archive all active Closed cards atomically without deleting their records."""
+        now = _now()
+        with self._write() as conn:
+            rows = conn.execute(
+                "SELECT * FROM kanban_tasks WHERE status='closed' AND archived_at IS NULL "
+                "ORDER BY position, created_at, id"
+            ).fetchall()
+            ids = [row["id"] for row in rows]
+            if not ids:
+                return []
+            placeholders = ",".join("?" for _ in ids)
+            conn.execute(
+                f"UPDATE kanban_tasks SET archived_at=?, updated_at=?, version=version+1 "
+                f"WHERE id IN ({placeholders})",
+                (now, now, *ids),
+            )
+            archived = conn.execute(
+                f"SELECT * FROM kanban_tasks WHERE id IN ({placeholders}) ORDER BY position, created_at, id",
+                ids,
+            ).fetchall()
+            return [dict(row) for row in archived]

@@ -9,10 +9,13 @@ Status: **v0.1.0 development candidate**. Linux source qualification is complete
 - Native primary-rail **Kanban** view with Board and List modes.
 - Five durable states: Open, In progress, Blocked, Deferred, and Closed.
 - Atomic same-column rank and cross-column move operations.
+- Individually collapsible vertical status columns with the layout preference retained in the browser.
 - Drag/drop plus status selectors and earlier/later controls for keyboard, screen-reader, and mobile fallback.
 - Create, edit, move, close, reopen, and delete controls.
+- Exact, small `card_id` labels on cards and in List mode for direct agent lookup.
+- Non-destructive **Archive all** for Closed cards plus a read-only Archived view.
 - Search, optimistic move display, stale-write conflict detection, rollback, and authoritative refresh.
-- Six namespaced agent tools using the same task store and ordering as the UI.
+- Eight namespaced agent tools, including exact-card lookup and bulk Closed archival.
 - Plugin-owned SQLite state under the active protoAgent instance root; no core schema edits or private plugin imports.
 - A `simple_kanban.changed` event hint after committed mutations.
 
@@ -46,7 +49,7 @@ python -m venv .venv
 
 ## Data model
 
-Each task owns a stable ID, title, description, status, dense per-status position, optimistic-concurrency version, priority, issue type, assignee, lifecycle timestamps, close metadata, and optional source identity. Every move runs in one SQLite transaction and renumbers affected columns before commit.
+Each task owns a stable ID, title, description, status, dense per-status position, optimistic-concurrency version, priority, issue type, assignee, lifecycle timestamps, close/archive metadata, and optional source identity. Every move runs in one SQLite transaction and renumbers affected columns before commit. Archival is distinct from deletion: it atomically timestamps every active Closed card, keeps the complete records addressable by `card_id`, and removes them from the active Board/List.
 
 ## Platform status
 

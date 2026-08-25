@@ -8,10 +8,12 @@ def test_registers_complete_plugin(plugin, registry):
     assert [tool.name for tool in registry.tools] == [
         "simple_kanban_task_create",
         "simple_kanban_task_list",
+        "simple_kanban_task_get",
         "simple_kanban_task_update",
         "simple_kanban_task_move",
         "simple_kanban_task_close",
         "simple_kanban_task_delete",
+        "simple_kanban_closed_archive",
     ]
     assert registry.skill_dirs == ["skills"]
     assert [prefix for prefix, _router in registry.routers] == [
@@ -67,6 +69,13 @@ def test_view_is_single_slug_aware_page(plugin):
     assert "rankCapabilities(task)" in html
     assert "rank-badge" in html
     assert ".icon-button svg" in html
+    assert "card_id: ${task.id}" in html
+    assert 'localStorage.getItem("simple-kanban.collapsed")' in html
+    assert 'localStorage.setItem("simple-kanban.collapsed"' in html
+    assert "writing-mode:vertical-rl" in html
+    assert "Archive all ${count} Closed cards" in html
+    assert 'request("/tasks/archive-closed"' in html
+    assert 'request(state.archived?"/tasks?archived=true":"/tasks")' in html
     assert (
         "filteredTasks().sort((a,b)=>STATUSES.indexOf(a.status)-STATUSES.indexOf(b.status)||a.position-b.position)"
         in html

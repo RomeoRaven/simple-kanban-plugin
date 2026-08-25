@@ -17,7 +17,7 @@ views:
     path: /plugins/simple_kanban/view
 emits:
   - topic: changed
-    summary: A Simple Kanban task was created, updated, moved, closed, reopened, or deleted.
+    summary: A Simple Kanban card was created, updated, moved, closed, reopened, archived, or deleted.
     schema:
       type: object
       required: [action, task_id, status, version]
