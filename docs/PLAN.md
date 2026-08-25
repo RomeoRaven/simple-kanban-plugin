@@ -1,6 +1,6 @@
 # Kanban plugin — extraction specification
 
-Status: v0.1.0 implementation candidate for S1-dev acceptance; stable and Windows remain unqualified
+Status: v0.2.0 implementation candidate for S1-dev acceptance; v0.1.0 remains stable and Windows remains unqualified
 Date: 2026-08-23
 Source behavior: accepted RR candidate `90d77beaf29db6f1d2ca03e5c4988226d0dc5eca`
 Target host reviewed: upstream protoAgent `v0.147.0`
@@ -71,6 +71,7 @@ Default statuses: `open`, `in_progress`, `blocked`, `deferred`, `closed`.
 - Optimistic UI serializes local moves, rolls back failures, explains conflicts, and reloads authoritative state.
 - Cards, buttons, menus, and board scrolling remain usable while drag is enabled.
 - Every vertical status column can collapse to a slim persisted rail without changing card state.
+- One persisted Board-wide Condensed toggle hides descriptions, metadata, and lifecycle actions so each card keeps its drag handle, compact copyable ID, clickable edit title, and earlier/later controls; List and Archived views remain unchanged.
 - Every card displays a compact `K-XXXXXXXX` reference beside a copy control for the exact durable `card_id`; agents can resolve either a unique compact reference or the copied full ID directly.
 
 ## Self-reliant architecture

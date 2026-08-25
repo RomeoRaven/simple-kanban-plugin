@@ -19,7 +19,11 @@ function savedCollapsed() {
   try { return new Set(JSON.parse(localStorage.getItem("simple-kanban.collapsed") || "[]").filter((status)=>STATUSES.includes(status))); }
   catch { return new Set(); }
 }
-const state = {tasks:[], mode:localStorage.getItem("simple-kanban.mode") || "board", archived:false, collapsed:savedCollapsed(), archiveConfirmUntil:0, query:"", dragging:null, moving:false, saving:false, needsRefresh:false, loaded:false};
+function savedCondensed() {
+  try { return localStorage.getItem("simple-kanban.condensed") === "true"; }
+  catch { return false; }
+}
+const state = {tasks:[], mode:localStorage.getItem("simple-kanban.mode") || "board", archived:false, collapsed:savedCollapsed(), condensed:savedCondensed(), archiveConfirmUntil:0, query:"", dragging:null, moving:false, saving:false, needsRefresh:false, loaded:false};
 const content = document.getElementById("content");
 const notice = document.getElementById("notice");
 const dialog = document.getElementById("task-dialog");
@@ -92,6 +96,12 @@ function toggleColumn(status) {
   if(state.collapsed.has(status))state.collapsed.delete(status);else state.collapsed.add(status);
   localStorage.setItem("simple-kanban.collapsed",JSON.stringify([...state.collapsed]));render();
 }
+function toggleCondensed() {
+  if(state.archived||state.mode!=="board")return;
+  state.condensed=!state.condensed;
+  localStorage.setItem("simple-kanban.condensed",String(state.condensed));
+  render();
+}
 function rankCapabilities(task) {
   const ranked=rankedTasks(task.status);const index=ranked.findIndex((item)=>item.id===task.id);return {earlier:index>0,later:index>=0&&index<ranked.length-1};
 }
@@ -111,7 +121,8 @@ function card(task) {
   article.addEventListener("drop", (event) => { event.preventDefault(); event.stopPropagation(); article.classList.remove("drop-before"); if (state.dragging && state.dragging !== task.id) void moveTask(state.dragging, task.status, task.id); });
   const body = node("div","card-body");
   body.append(cardIdControl(task));
-  body.append(node("div","card-title",task.title));
+  const title=node("button","card-title",task.title);title.type="button";title.dataset.action="edit";title.title=`Edit ${task.title}`;title.setAttribute("aria-label",`Edit ${task.title}`);body.append(title);
+  const condensedRank=node("div","condensed-rank-actions");const condensedCapability=rankCapabilities(task);condensedRank.append(actionButton("earlier",condensedCapability.earlier?"Move up":"Already first in column","up",!condensedCapability.earlier),actionButton("later",condensedCapability.later?"Move down":"Already last in column","down",!condensedCapability.later));body.append(condensedRank);
   if (task.description) body.append(node("div","card-description",task.description));
   const meta=node("div","meta");const rank=node("span","badge rank-badge",`#${task.position}`);rank.title=`Rank ${task.position} in ${LABELS[task.status]}`;rank.setAttribute("aria-label",rank.title);meta.append(rank);
   meta.append(node("span",`badge priority-${task.priority}`,PRIORITIES[task.priority] || "Normal"));
@@ -126,7 +137,7 @@ function card(task) {
   article.append(handle,body); return article;
 }
 function renderBoard() {
-  const board=node("div","board");
+  const board=node("div",`board${state.condensed?" condensed":""}`);
   for (const status of STATUSES) {
     const collapsed=state.collapsed.has(status);const column=node("section",`column${collapsed?" collapsed":""}`);column.dataset.status=status;column.setAttribute("aria-label",LABELS[status]);column.setAttribute("aria-expanded",String(!collapsed));
     const head=node("div","column-head");const heading=node("div","column-heading");heading.append(node("span","column-title",LABELS[status]),node("span","count",String(tasksIn(status).length)));const controls=node("div","column-controls");
@@ -163,6 +174,8 @@ function render() {
   content.replaceChildren(state.archived?renderArchived():(state.mode === "list" ? renderList() : renderBoard())); content.setAttribute("aria-busy","false");
   document.getElementById("board-mode").setAttribute("aria-pressed",String(state.mode==="board"));
   document.getElementById("list-mode").setAttribute("aria-pressed",String(state.mode==="list"));
+  document.getElementById("condensed-mode").setAttribute("aria-pressed",String(state.condensed));
+  document.getElementById("condensed-mode").disabled=state.archived||state.mode!=="board";
   document.getElementById("board-mode").disabled=state.archived;document.getElementById("list-mode").disabled=state.archived;document.getElementById("add-task").disabled=state.archived;document.getElementById("show-archive").setAttribute("aria-pressed",String(state.archived));document.querySelector(".topbar h1").textContent=state.archived?"Kanban archive":"Kanban";
 }
 async function load({quiet=false,required=false}={}) {
@@ -230,5 +243,5 @@ function subscribeToChanges(){
 }
 content.addEventListener("click",(event)=>{const copy=event.target.closest("button[data-copy-id]");if(copy){void copyCardId(copy.dataset.copyId);return;}const button=event.target.closest("button[data-action]");if(!button)return;const owner=button.closest("[data-id]");const task=taskById(owner?.dataset.id);if(task)void simpleAction(task,button.dataset.action);});
 for(const status of STATUSES){const option=node("option","",LABELS[status]);option.value=status;document.getElementById("task-status").append(option);}
-document.getElementById("add-task").addEventListener("click",()=>openDialog());document.getElementById("refresh").addEventListener("click",()=>void load());document.getElementById("show-archive").addEventListener("click",()=>void toggleArchive());document.getElementById("board-mode").addEventListener("click",()=>{state.mode="board";localStorage.setItem("simple-kanban.mode",state.mode);render();});document.getElementById("list-mode").addEventListener("click",()=>{state.mode="list";localStorage.setItem("simple-kanban.mode",state.mode);render();});document.getElementById("search").addEventListener("input",(event)=>{state.query=event.target.value;render();});document.getElementById("cancel").addEventListener("click",()=>{if(!state.saving)dialog.close();});document.getElementById("cancel-x").addEventListener("click",()=>{if(!state.saving)dialog.close();});dialog.addEventListener("cancel",(event)=>{if(state.saving)event.preventDefault();});form.addEventListener("submit",saveTask);window.addEventListener("focus",()=>void load({quiet:true}));subscribeToChanges();setInterval(()=>{if(document.visibilityState==="visible"&&(!dialog.open||state.needsRefresh))void load({quiet:true});},15000);
+document.getElementById("add-task").addEventListener("click",()=>openDialog());document.getElementById("refresh").addEventListener("click",()=>void load());document.getElementById("condensed-mode").addEventListener("click",toggleCondensed);document.getElementById("show-archive").addEventListener("click",()=>void toggleArchive());document.getElementById("board-mode").addEventListener("click",()=>{state.mode="board";localStorage.setItem("simple-kanban.mode",state.mode);render();});document.getElementById("list-mode").addEventListener("click",()=>{state.mode="list";localStorage.setItem("simple-kanban.mode",state.mode);render();});document.getElementById("search").addEventListener("input",(event)=>{state.query=event.target.value;render();});document.getElementById("cancel").addEventListener("click",()=>{if(!state.saving)dialog.close();});document.getElementById("cancel-x").addEventListener("click",()=>{if(!state.saving)dialog.close();});dialog.addEventListener("cancel",(event)=>{if(state.saving)event.preventDefault();});form.addEventListener("submit",saveTask);window.addEventListener("focus",()=>void load({quiet:true}));subscribeToChanges();setInterval(()=>{if(document.visibilityState==="visible"&&(!dialog.open||state.needsRefresh))void load({quiet:true});},15000);
 await load();

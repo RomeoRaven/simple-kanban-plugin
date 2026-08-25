@@ -1,5 +1,6 @@
 ---
 name: simple-kanban
+description: Use for the operator's ranked Simple Kanban working queue.
 summary: Use for the operator's ranked Simple Kanban working queue.
 ---
 
