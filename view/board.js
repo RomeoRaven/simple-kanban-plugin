@@ -18,7 +18,7 @@ function savedCollapsed() {
   try { return new Set(JSON.parse(localStorage.getItem("simple-kanban.collapsed") || "[]").filter((status)=>STATUSES.includes(status))); }
   catch { return new Set(); }
 }
-const state = {tasks:[], mode:localStorage.getItem("simple-kanban.mode") || "board", archived:false, collapsed:savedCollapsed(), query:"", dragging:null, moving:false, saving:false, needsRefresh:false, loaded:false};
+const state = {tasks:[], mode:localStorage.getItem("simple-kanban.mode") || "board", archived:false, collapsed:savedCollapsed(), archiveConfirmUntil:0, query:"", dragging:null, moving:false, saving:false, needsRefresh:false, loaded:false};
 const content = document.getElementById("content");
 const notice = document.getElementById("notice");
 const dialog = document.getElementById("task-dialog");
@@ -119,7 +119,7 @@ function renderBoard() {
   for (const status of STATUSES) {
     const collapsed=state.collapsed.has(status);const column=node("section",`column${collapsed?" collapsed":""}`);column.dataset.status=status;column.setAttribute("aria-label",LABELS[status]);column.setAttribute("aria-expanded",String(!collapsed));
     const head=node("div","column-head");const heading=node("div","column-heading");heading.append(node("span","column-title",LABELS[status]),node("span","count",String(tasksIn(status).length)));const controls=node("div","column-controls");
-    if(status==="closed"){const count=rankedTasks("closed").length;const archive=iconButton(count?`Archive all ${count} Closed cards`:"No Closed cards to archive","archive",count===0);archive.classList.add("archive-closed");archive.addEventListener("click",()=>void archiveClosed());controls.append(archive);}
+    if(status==="closed"){const count=rankedTasks("closed").length;const armed=state.archiveConfirmUntil>Date.now();const archive=iconButton(count?(armed?`Confirm archive all ${count} Closed cards`:`Archive all ${count} Closed cards`):"No Closed cards to archive","archive",count===0);archive.classList.add("archive-closed");archive.classList.toggle("confirm",armed);archive.addEventListener("click",()=>void archiveClosed());controls.append(archive);}
     const toggle=iconButton(collapsed?`Expand ${LABELS[status]} column`:`Collapse ${LABELS[status]} column`,collapsed?"expand":"collapse");toggle.classList.add("column-toggle");toggle.setAttribute("aria-expanded",String(!collapsed));toggle.addEventListener("click",()=>toggleColumn(status));controls.append(toggle);head.append(heading,controls);column.append(head);
     const cards=node("div","cards");
     column.addEventListener("dragover",(event)=>{if(state.dragging){event.preventDefault();column.classList.add("drag-over");}});
@@ -205,7 +205,7 @@ async function simpleAction(task,action){
   finally{if(!state.needsRefresh)state.moving=false;render();}
 }
 async function archiveClosed(){
-  if(state.moving||state.archived)return;const count=rankedTasks("closed").length;if(!count)return;if(!confirm(`Archive all ${count} cards in Closed? Archived cards remain available in the Archived view.`))return;state.moving=true;render();message("Archiving Closed cards…");let applied=false;
+  if(state.moving||state.archived)return;const count=rankedTasks("closed").length;if(!count)return;if(state.archiveConfirmUntil<=Date.now()){state.archiveConfirmUntil=Date.now()+8000;render();message(`Click Archive again to confirm all ${count} Closed cards. Records remain available in Archived.`);setTimeout(()=>{if(state.archiveConfirmUntil&&state.archiveConfirmUntil<=Date.now()){state.archiveConfirmUntil=0;render();}},8100);return;}state.archiveConfirmUntil=0;state.moving=true;render();message("Archiving Closed cards…");let applied=false;
   try{const result=await request("/tasks/archive-closed",{method:"POST"});applied=true;await load({quiet:true,required:true});message(`${result.archived} Closed card${result.archived===1?"":"s"} archived`);}
   catch(error){if(applied||!error.status||error.status>=500){try{await load({quiet:true,required:true});message("Archive response was uncertain; the board was reconciled. Check Archived before retrying.",true);}catch{state.needsRefresh=true;message(`Archive may have completed, but refresh failed: ${error.message}`,true);}}else message(`Archive failed: ${error.message}`,true);}
   finally{if(!state.needsRefresh)state.moving=false;render();}

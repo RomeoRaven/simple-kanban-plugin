@@ -74,6 +74,8 @@ def test_view_is_single_slug_aware_page(plugin):
     assert 'localStorage.setItem("simple-kanban.collapsed"' in html
     assert "writing-mode:vertical-rl" in html
     assert "Archive all ${count} Closed cards" in html
+    assert "Confirm archive all ${count} Closed cards" in html
+    assert "archiveConfirmUntil" in html
     assert 'request("/tasks/archive-closed"' in html
     assert 'request(state.archived?"/tasks?archived=true":"/tasks")' in html
     assert (

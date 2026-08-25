@@ -13,7 +13,7 @@ Status: **v0.1.0 development candidate**. Linux source qualification is complete
 - Drag/drop plus status selectors and earlier/later controls for keyboard, screen-reader, and mobile fallback.
 - Create, edit, move, close, reopen, and delete controls.
 - Exact, small `card_id` labels on cards and in List mode for direct agent lookup.
-- Non-destructive **Archive all** for Closed cards plus a read-only Archived view.
+- Non-destructive **Archive all** for Closed cards with an explicit second-click confirmation plus a read-only Archived view.
 - Search, optimistic move display, stale-write conflict detection, rollback, and authoritative refresh.
 - Eight namespaced agent tools, including exact-card lookup and bulk Closed archival.
 - Plugin-owned SQLite state under the active protoAgent instance root; no core schema edits or private plugin imports.
