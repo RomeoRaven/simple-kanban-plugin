@@ -52,6 +52,9 @@ def test_view_is_single_slug_aware_page(plugin):
     assert "else if(error.status)" in html
     assert "Save response lost; board reconciled" in html
     assert "if(dialog.open)dialog.close();setDialogSaving(false)" in html
+    assert "error.status===409" in html
+    assert "Save conflict; board reloaded." in html
+    assert "(!dialog.open||state.needsRefresh)" in html
     assert (
         "filteredTasks().sort((a,b)=>STATUSES.indexOf(a.status)-STATUSES.indexOf(b.status)||a.position-b.position)"
         in html
