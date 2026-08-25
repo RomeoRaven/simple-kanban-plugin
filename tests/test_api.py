@@ -78,7 +78,14 @@ def test_api_requires_version_and_valid_fields(plugin, tmp_path):
         ).status_code
         == 422
     )
-    for priority in (True, 1.9, "²"):
+    assert (
+        client.patch(
+            f"/api/plugins/simple_kanban/tasks/{task['id']}",
+            json={"expected_version": "9" * 5000, "title": "Changed"},
+        ).status_code
+        == 422
+    )
+    for priority in (True, 1.9, "²", "9" * 5000):
         assert (
             client.post("/api/plugins/simple_kanban/tasks", json={"title": "Bad", "priority": priority}).status_code
             == 422

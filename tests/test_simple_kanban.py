@@ -49,7 +49,7 @@ def test_view_is_single_slug_aware_page(plugin):
     assert "needsRefresh:false" in html
     assert "if(!state.needsRefresh)state.moving=false" in html
     assert "item.status===task.status" in html
-    assert "else if(error.status)" in html
+    assert "error.status&&error.status<500" in html
     assert "Save response lost; board reconciled" in html
     assert "if(dialog.open)dialog.close();setDialogSaving(false)" in html
     assert "error.status===409" in html
