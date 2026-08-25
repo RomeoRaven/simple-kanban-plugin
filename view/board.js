@@ -121,7 +121,7 @@ function render() {
 }
 async function load({quiet=false,required=false}={}) {
   const generation=++loadGeneration;
-  try { const data=await request("/tasks");if(generation!==loadGeneration)return required?load({quiet,required}):false;state.tasks=data.tasks;if(state.needsRefresh){state.needsRefresh=false;state.moving=false;}render();if(!quiet)message(`${state.tasks.length} task${state.tasks.length===1?"":"s"}`);return true; }
+  try { const data=await request("/tasks");if(generation!==loadGeneration)return required?load({quiet,required}):false;state.tasks=data.tasks;if(state.needsRefresh){state.needsRefresh=false;state.moving=false;if(state.saving)setDialogSaving(false);}render();if(!quiet)message(`${state.tasks.length} task${state.tasks.length===1?"":"s"}`);return true; }
   catch(error){if(generation!==loadGeneration)return required?load({quiet,required}):false;content.replaceChildren(node("div","global-empty","Kanban could not load."));content.setAttribute("aria-busy","false");message(`Load failed: ${error.message}`,true);if(required)throw error;return false;}
 }
 function optimisticMove(id,status,beforeId){
@@ -153,7 +153,7 @@ async function saveTask(event){
     if(id){const current=taskById(id);const desiredStatus=payload.status;delete payload.status;if(current.status!==desiredStatus)await request(`/tasks/${encodeURIComponent(id)}/move`,{method:"POST",body:JSON.stringify({destination_status:desiredStatus,before_id:null,expected_version:capturedVersion,updates:payload})});else await request(`/tasks/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify({...payload,expected_version:capturedVersion})});}
     else await request("/tasks",{method:"POST",body:JSON.stringify(payload)});
     saved=true;dialog.close();await load({quiet:true,required:true});message(id?"Task updated":"Task created");
-  }catch(error){if(saved){try{await load({quiet:true,required:true});message(id?"Task updated after refresh retry":"Task created after refresh retry");}catch{state.needsRefresh=true;message(`Task saved, but refresh failed: ${error.message}`,true);}}else message(`Save failed: ${error.message}`,true);}finally{setDialogSaving(false);if(!state.needsRefresh)state.moving=false;render();}
+  }catch(error){if(saved){try{await load({quiet:true,required:true});message(id?"Task updated after refresh retry":"Task created after refresh retry");}catch{state.needsRefresh=true;message(`Task saved, but refresh failed: ${error.message}`,true);}}else if(error.status)message(`Save failed: ${error.message}`,true);else{try{await load({quiet:true,required:true});dialog.close();message("Save response lost; board reconciled. Check the task before retrying.",true);}catch{state.needsRefresh=true;message(`Save response lost and board refresh failed: ${error.message}`,true);}}}finally{if(!state.needsRefresh)setDialogSaving(false);if(!state.needsRefresh)state.moving=false;render();}
 }
 async function simpleAction(task,action){
   if(action==="edit"){openDialog(task);return;}
