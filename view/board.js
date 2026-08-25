@@ -6,7 +6,7 @@ const STATUSES = ["open", "in_progress", "blocked", "deferred", "closed"];
 const LABELS = {open:"Open",in_progress:"In progress",blocked:"Blocked",deferred:"Deferred",closed:"Closed"};
 const PRIORITIES = ["Urgent","High","Normal","Low","Someday"];
 const API = "/api/plugins/simple_kanban";
-const state = {tasks:[], mode:localStorage.getItem("simple-kanban.mode") || "board", query:"", dragging:null, moving:false, saving:false, needsRefresh:false};
+const state = {tasks:[], mode:localStorage.getItem("simple-kanban.mode") || "board", query:"", dragging:null, moving:false, saving:false, needsRefresh:false, loaded:false};
 const content = document.getElementById("content");
 const notice = document.getElementById("notice");
 const dialog = document.getElementById("task-dialog");
@@ -121,8 +121,8 @@ function render() {
 }
 async function load({quiet=false,required=false}={}) {
   const generation=++loadGeneration;
-  try { const data=await request("/tasks");if(generation!==loadGeneration)return required?load({quiet,required}):false;state.tasks=data.tasks;if(state.needsRefresh){state.needsRefresh=false;state.moving=false;if(state.saving){if(dialog.open)dialog.close();setDialogSaving(false);}}render();if(!quiet)message(`${state.tasks.length} task${state.tasks.length===1?"":"s"}`);return true; }
-  catch(error){if(generation!==loadGeneration)return required?load({quiet,required}):false;content.replaceChildren(node("div","global-empty","Kanban could not load."));content.setAttribute("aria-busy","false");message(`Load failed: ${error.message}`,true);if(required)throw error;return false;}
+  try { const data=await request("/tasks");if(generation!==loadGeneration)return required?load({quiet,required}):false;state.tasks=data.tasks;state.loaded=true;if(state.needsRefresh){state.needsRefresh=false;state.moving=false;if(state.saving){if(dialog.open)dialog.close();setDialogSaving(false);}}render();if(!quiet)message(`${state.tasks.length} task${state.tasks.length===1?"":"s"}`);return true; }
+  catch(error){if(generation!==loadGeneration)return required?load({quiet,required}):false;if(required||!state.loaded){content.replaceChildren(node("div","global-empty","Kanban could not load."));content.setAttribute("aria-busy","false");}message(`Load failed: ${error.message}`,true);if(required)throw error;return false;}
 }
 function optimisticMove(id,status,beforeId){
   const task=taskById(id); if(!task)return;
