@@ -6,7 +6,7 @@ const STATUSES = ["open", "in_progress", "blocked", "deferred", "closed"];
 const LABELS = {open:"Open",in_progress:"In progress",blocked:"Blocked",deferred:"Deferred",closed:"Closed"};
 const PRIORITIES = ["Urgent","High","Normal","Low","Someday"];
 const API = "/api/plugins/simple_kanban";
-const state = {tasks:[], mode:localStorage.getItem("simple-kanban.mode") || "board", query:"", dragging:null, moving:false, saving:false};
+const state = {tasks:[], mode:localStorage.getItem("simple-kanban.mode") || "board", query:"", dragging:null, moving:false, saving:false, needsRefresh:false};
 const content = document.getElementById("content");
 const notice = document.getElementById("notice");
 const dialog = document.getElementById("task-dialog");
@@ -121,12 +121,13 @@ function render() {
 }
 async function load({quiet=false,required=false}={}) {
   const generation=++loadGeneration;
-  try { const data=await request("/tasks");if(generation!==loadGeneration)return required?load({quiet,required}):false;state.tasks=data.tasks;render();if(!quiet)message(`${state.tasks.length} task${state.tasks.length===1?"":"s"}`);return true; }
+  try { const data=await request("/tasks");if(generation!==loadGeneration)return required?load({quiet,required}):false;state.tasks=data.tasks;if(state.needsRefresh){state.needsRefresh=false;state.moving=false;}render();if(!quiet)message(`${state.tasks.length} task${state.tasks.length===1?"":"s"}`);return true; }
   catch(error){if(generation!==loadGeneration)return required?load({quiet,required}):false;content.replaceChildren(node("div","global-empty","Kanban could not load."));content.setAttribute("aria-busy","false");message(`Load failed: ${error.message}`,true);if(required)throw error;return false;}
 }
 function optimisticMove(id,status,beforeId){
   const task=taskById(id); if(!task)return;
   state.tasks=state.tasks.filter((item)=>item.id!==id);
+  state.tasks.filter((item)=>item.status===task.status).sort((a,b)=>a.position-b.position).forEach((item,i)=>{item.position=i+1;});
   const destination=state.tasks.filter((item)=>item.status===status).sort((a,b)=>a.position-b.position);
   const index=beforeId?destination.findIndex((item)=>item.id===beforeId):destination.length;
   destination.splice(index<0?destination.length:index,0,{...task,status}); destination.forEach((item,i)=>item.position=i+1);
@@ -138,8 +139,8 @@ async function moveTask(id,status,beforeId){
   const task=taskById(id); if(!task || (task.status===status && beforeId===id))return;
   state.moving=true;const snapshot=structuredClone(state.tasks);let moved=false;optimisticMove(id,status,beforeId);message("Saving move…");
   try{await request(`/tasks/${encodeURIComponent(id)}/move`,{method:"POST",body:JSON.stringify({destination_status:status,before_id:beforeId,expected_version:task.version})});moved=true;await load({quiet:true,required:true});message("Move saved");}
-  catch(error){if(!moved){state.tasks=snapshot;render();}try{await load({quiet:true,required:true});message(moved?"Move saved after refresh retry":`${error.message}. Board reloaded.`,!moved);}catch{message(moved?`Move saved, but refresh failed: ${error.message}`:`${error.message}. Board reload failed.`,true);}}
-  finally{state.moving=false;render();}
+  catch(error){if(!moved){state.tasks=snapshot;render();}try{await load({quiet:true,required:true});message(moved?"Move saved after refresh retry":`${error.message}. Board reloaded.`,!moved);}catch{state.needsRefresh=true;message(moved?`Move saved, but refresh failed: ${error.message}`:`${error.message}. Board reload failed.`,true);}}
+  finally{if(!state.needsRefresh)state.moving=false;render();}
 }
 function openDialog(task=null){
   if(state.saving||state.moving)return;
@@ -152,7 +153,7 @@ async function saveTask(event){
     if(id){const current=taskById(id);const desiredStatus=payload.status;delete payload.status;if(current.status!==desiredStatus)await request(`/tasks/${encodeURIComponent(id)}/move`,{method:"POST",body:JSON.stringify({destination_status:desiredStatus,before_id:null,expected_version:capturedVersion,updates:payload})});else await request(`/tasks/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify({...payload,expected_version:capturedVersion})});}
     else await request("/tasks",{method:"POST",body:JSON.stringify(payload)});
     saved=true;dialog.close();await load({quiet:true,required:true});message(id?"Task updated":"Task created");
-  }catch(error){if(saved){try{await load({quiet:true,required:true});message(id?"Task updated after refresh retry":"Task created after refresh retry");}catch{message(`Task saved, but refresh failed: ${error.message}`,true);}}else message(`Save failed: ${error.message}`,true);}finally{setDialogSaving(false);state.moving=false;render();}
+  }catch(error){if(saved){try{await load({quiet:true,required:true});message(id?"Task updated after refresh retry":"Task created after refresh retry");}catch{state.needsRefresh=true;message(`Task saved, but refresh failed: ${error.message}`,true);}}else message(`Save failed: ${error.message}`,true);}finally{setDialogSaving(false);if(!state.needsRefresh)state.moving=false;render();}
 }
 async function simpleAction(task,action){
   if(action==="edit"){openDialog(task);return;}
@@ -165,8 +166,8 @@ async function simpleAction(task,action){
     if(action==="reopen")await request(`/tasks/${encodeURIComponent(task.id)}/reopen`,{method:"POST",body:JSON.stringify({expected_version:task.version})});
     if(action==="delete")await request(`/tasks/${encodeURIComponent(task.id)}?expected_version=${task.version}`,{method:"DELETE"});
     applied=true;await load({quiet:true,required:true});message(action==="delete"?"Task deleted":"Task updated");
-  }catch(error){if(applied){try{await load({quiet:true,required:true});message(action==="delete"?"Task deleted after refresh retry":"Task updated after refresh retry");}catch{message(`Task changed, but refresh failed: ${error.message}`,true);}}else{message(`${action} failed: ${error.message}`,true);try{await load({quiet:true,required:true});}catch{}}}
-  finally{state.moving=false;render();}
+  }catch(error){if(applied){try{await load({quiet:true,required:true});message(action==="delete"?"Task deleted after refresh retry":"Task updated after refresh retry");}catch{state.needsRefresh=true;message(`Task changed, but refresh failed: ${error.message}`,true);}}else{message(`${action} failed: ${error.message}`,true);try{await load({quiet:true,required:true});}catch{state.needsRefresh=true;}}}
+  finally{if(!state.needsRefresh)state.moving=false;render();}
 }
 function subscribeToChanges(){
   window.addEventListener("message",(event)=>{if(event.source===window.parent&&event.data?.type==="protoagent:event"&&event.data.topic==="simple_kanban.changed")void load({quiet:true});});
