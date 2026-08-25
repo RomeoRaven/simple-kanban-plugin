@@ -121,7 +121,7 @@ function render() {
 }
 async function load({quiet=false,required=false}={}) {
   const generation=++loadGeneration;
-  try { const data=await request("/tasks");if(generation!==loadGeneration)return required?load({quiet,required}):false;state.tasks=data.tasks;if(state.needsRefresh){state.needsRefresh=false;state.moving=false;if(state.saving)setDialogSaving(false);}render();if(!quiet)message(`${state.tasks.length} task${state.tasks.length===1?"":"s"}`);return true; }
+  try { const data=await request("/tasks");if(generation!==loadGeneration)return required?load({quiet,required}):false;state.tasks=data.tasks;if(state.needsRefresh){state.needsRefresh=false;state.moving=false;if(state.saving){if(dialog.open)dialog.close();setDialogSaving(false);}}render();if(!quiet)message(`${state.tasks.length} task${state.tasks.length===1?"":"s"}`);return true; }
   catch(error){if(generation!==loadGeneration)return required?load({quiet,required}):false;content.replaceChildren(node("div","global-empty","Kanban could not load."));content.setAttribute("aria-busy","false");message(`Load failed: ${error.message}`,true);if(required)throw error;return false;}
 }
 function optimisticMove(id,status,beforeId){
