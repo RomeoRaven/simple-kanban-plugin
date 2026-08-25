@@ -105,7 +105,7 @@ function renderList() {
   const wrap=node("div","list-wrap"); const table=node("table","list");
   const thead=node("thead"); const tr=node("tr"); ["Rank","Task","Status","Priority","Type","Assignee","Actions"].forEach((x)=>tr.append(node("th","",x))); thead.append(tr); table.append(thead);
   const tbody=node("tbody");
-  for(const task of filteredTasks()){
+  for(const task of filteredTasks().sort((a,b)=>STATUSES.indexOf(a.status)-STATUSES.indexOf(b.status)||a.position-b.position)){
     const row=node("tr"); row.dataset.id=task.id;
     row.append(node("td","",String(task.position)),node("td","list-title",task.title));
     const s=node("td");s.append(statusSelect(task));row.append(s,node("td",`priority-${task.priority}`,PRIORITIES[task.priority]),node("td","",task.issue_type),node("td","",task.assignee||"—"));
