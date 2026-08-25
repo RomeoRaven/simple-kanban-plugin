@@ -1,6 +1,6 @@
 # Kanban plugin — extraction specification
 
-Status: Design extraction from accepted S1 candidate; implementation not yet authorized
+Status: v0.1.0 implementation candidate for S1-dev acceptance; stable and Windows remain unqualified
 Date: 2026-08-23
 Source behavior: accepted RR candidate `90d77beaf29db6f1d2ca03e5c4988226d0dc5eca`
 Target host reviewed: upstream protoAgent `v0.147.0`
@@ -43,6 +43,7 @@ Plugin id: `simple_kanban`.
 - `issue_type`, `assignee`;
 - `created_at`, `updated_at`;
 - `closed_at`, `close_reason`;
+- `archived_at` for non-destructive removal from the active board;
 - optional source/import metadata.
 
 Default statuses: `open`, `in_progress`, `blocked`, `deferred`, `closed`.
@@ -59,6 +60,7 @@ Default statuses: `open`, `in_progress`, `blocked`, `deferred`, `closed`.
 - Deletion renumbers the affected column.
 - Stale versions return a conflict without overwriting newer work.
 - Agent listing uses the same ranked order as the operator view.
+- Archive-all affects only active Closed cards, preserves complete records, and is idempotent.
 
 ### Interaction rules
 
@@ -68,6 +70,8 @@ Default statuses: `open`, `in_progress`, `blocked`, `deferred`, `closed`.
 - Status selector remains the keyboard, screen-reader, and mobile fallback.
 - Optimistic UI serializes local moves, rolls back failures, explains conflicts, and reloads authoritative state.
 - Cards, buttons, menus, and board scrolling remain usable while drag is enabled.
+- Every vertical status column can collapse to a slim persisted rail without changing card state.
+- Every card displays a compact `K-XXXXXXXX` reference beside a copy control for the exact durable `card_id`; agents can resolve either a unique compact reference or the copied full ID directly.
 
 ## Self-reliant architecture
 
@@ -105,6 +109,7 @@ Gated plugin-owned routes under `/api/plugins/simple_kanban`:
 - list/get/create/update/delete;
 - close/reopen;
 - atomic move/reorder;
+- bulk Closed archival and archived-card listing;
 - optional one-time import preview/execute.
 
 Public page route: `/plugins/simple_kanban/view`.
@@ -115,10 +120,12 @@ Distinct names avoid collisions with core tools and future official plugins:
 
 - `simple_kanban_task_create`;
 - `simple_kanban_task_list`;
+- `simple_kanban_task_get`;
 - `simple_kanban_task_update`;
 - `simple_kanban_task_move`;
 - `simple_kanban_task_close`;
 - `simple_kanban_task_delete`.
+- `simple_kanban_closed_archive`.
 
 A bundled skill tells the agent when to use Kanban versus Project Board or native Tasks. Host configuration may prefer these tools, but the plugin must not require removal of core tools.
 
