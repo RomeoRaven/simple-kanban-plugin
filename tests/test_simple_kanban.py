@@ -58,7 +58,15 @@ def test_view_is_single_slug_aware_page(plugin):
     assert "loaded:false" in html
     assert "if(required||!state.loaded)" in html
     assert 'setAttribute("aria-label",title)' in html
-    assert 'actionButton("←","earlier","Move earlier")' in html
+    assert (
+        'actionButton("earlier",capability.earlier?"Move up":"Already first in column","up",!capability.earlier)'
+        in html
+    )
+    assert 'actionButton("edit","Edit task","edit")' in html
+    assert 'actionButton("delete","Delete task","delete")' in html
+    assert "rankCapabilities(task)" in html
+    assert "rank-badge" in html
+    assert ".icon-button svg" in html
     assert (
         "filteredTasks().sort((a,b)=>STATUSES.indexOf(a.status)-STATUSES.indexOf(b.status)||a.position-b.position)"
         in html

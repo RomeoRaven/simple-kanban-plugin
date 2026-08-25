@@ -6,6 +6,12 @@ const STATUSES = ["open", "in_progress", "blocked", "deferred", "closed"];
 const LABELS = {open:"Open",in_progress:"In progress",blocked:"Blocked",deferred:"Deferred",closed:"Closed"};
 const PRIORITIES = ["Urgent","High","Normal","Low","Someday"];
 const API = "/api/plugins/simple_kanban";
+const ICON_PATHS = {
+  up:["m18 15-6-6-6 6"], down:["m6 9 6 6 6-6"],
+  edit:["M12 20h9","M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"],
+  close:["m20 6-11 11-5-5"], reopen:["M3 12a9 9 0 1 0 3-6.7","M3 3v6h6"],
+  delete:["M3 6h18","M8 6V4h8v2","M19 6l-1 14H6L5 6","M10 11v5","M14 11v5"],
+};
 const state = {tasks:[], mode:localStorage.getItem("simple-kanban.mode") || "board", query:"", dragging:null, moving:false, saving:false, needsRefresh:false, loaded:false};
 const content = document.getElementById("content");
 const notice = document.getElementById("notice");
@@ -55,8 +61,15 @@ function statusSelect(task) {
   select.addEventListener("change", () => void moveTask(task.id, select.value, null));
   return select;
 }
-function actionButton(label, action, title=label) {
-  const button=node("button","",label);button.type="button";button.dataset.action=action;button.title=title;button.setAttribute("aria-label",title);button.disabled=state.moving;return button;
+function icon(name) {
+  const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("viewBox","0 0 24 24");svg.setAttribute("aria-hidden","true");
+  for(const d of ICON_PATHS[name]){const path=document.createElementNS("http://www.w3.org/2000/svg","path");path.setAttribute("d",d);svg.append(path);}return svg;
+}
+function actionButton(action, title, iconName, disabled=false) {
+  const button=node("button","icon-button");button.type="button";button.dataset.action=action;button.title=title;button.setAttribute("aria-label",title);button.disabled=state.moving||disabled;button.append(icon(iconName));return button;
+}
+function rankCapabilities(task) {
+  const ranked=rankedTasks(task.status);const index=ranked.findIndex((item)=>item.id===task.id);return {earlier:index>0,later:index>=0&&index<ranked.length-1};
 }
 function card(task) {
   const article = node("article", "card"); article.dataset.id=task.id; article.draggable=!state.moving;
@@ -75,16 +88,16 @@ function card(task) {
   const body = node("div","card-body");
   body.append(node("div","card-title",task.title));
   if (task.description) body.append(node("div","card-description",task.description));
-  const meta=node("div","meta");
+  const meta=node("div","meta");const rank=node("span","badge rank-badge",`#${task.position}`);rank.title=`Rank ${task.position} in ${LABELS[task.status]}`;rank.setAttribute("aria-label",rank.title);meta.append(rank);
   meta.append(node("span",`badge priority-${task.priority}`,PRIORITIES[task.priority] || "Normal"));
   meta.append(node("span","badge",task.issue_type));
   if (task.assignee) meta.append(node("span","badge",task.assignee));
   meta.append(statusSelect(task));
   body.append(meta);
-  const actions=node("div","card-actions");
-  actions.append(actionButton("←","earlier","Move earlier"),actionButton("→","later","Move later"),actionButton("Edit","edit"));
-  if (task.status === "closed") actions.append(actionButton("Reopen","reopen")); else actions.append(actionButton("Close","close"));
-  actions.append(actionButton("Delete","delete")); body.append(actions);
+  const actions=node("div","card-actions");const capability=rankCapabilities(task);
+  actions.append(actionButton("earlier",capability.earlier?"Move up":"Already first in column","up",!capability.earlier),actionButton("later",capability.later?"Move down":"Already last in column","down",!capability.later),actionButton("edit","Edit task","edit"));
+  if (task.status === "closed") actions.append(actionButton("reopen","Reopen task","reopen")); else actions.append(actionButton("close","Close task","close"));
+  actions.append(actionButton("delete","Delete task","delete")); body.append(actions);
   article.append(handle,body); return article;
 }
 function renderBoard() {
@@ -109,7 +122,7 @@ function renderList() {
     const row=node("tr"); row.dataset.id=task.id;
     row.append(node("td","",String(task.position)),node("td","list-title",task.title));
     const s=node("td");s.append(statusSelect(task));row.append(s,node("td",`priority-${task.priority}`,PRIORITIES[task.priority]),node("td","",task.issue_type),node("td","",task.assignee||"—"));
-    const actions=node("td","list-actions");actions.append(actionButton("←","earlier","Move earlier"),actionButton("→","later","Move later"),actionButton("Edit","edit"),actionButton(task.status==="closed"?"Reopen":"Close",task.status==="closed"?"reopen":"close"));row.append(actions);tbody.append(row);
+    const capability=rankCapabilities(task);const actions=node("td","list-actions");actions.append(actionButton("earlier",capability.earlier?"Move up":"Already first in column","up",!capability.earlier),actionButton("later",capability.later?"Move down":"Already last in column","down",!capability.later),actionButton("edit","Edit task","edit"),task.status==="closed"?actionButton("reopen","Reopen task","reopen"):actionButton("close","Close task","close"),actionButton("delete","Delete task","delete"));row.append(actions);tbody.append(row);
   }
   if(!filteredTasks().length){const row=node("tr");const cell=node("td","global-empty","No matching tasks");cell.colSpan=7;row.append(cell);tbody.append(row);}
   table.append(tbody);wrap.append(table);return wrap;
