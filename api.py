@@ -38,7 +38,13 @@ def build_data_router():
 
     @router.get("/status")
     def status():
-        return {"plugin": "simple_kanban", "status": "ready", "schema": 2, "integrity": store().integrity()}
+        return {
+            "plugin": "simple_kanban",
+            "version": "0.3.0",
+            "status": "ready",
+            "schema": 2,
+            "integrity": store().integrity(),
+        }
 
     @router.get("/tasks")
     def list_tasks(

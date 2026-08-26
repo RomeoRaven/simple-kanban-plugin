@@ -12,6 +12,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from .epic_plans import blocked_message, summarize_epic_plan
+
 STATUSES = ("open", "in_progress", "blocked", "deferred", "closed")
 STATUS_INDEX = {status: index for index, status in enumerate(STATUSES)}
 PRIORITIES = (0, 1, 2, 3, 4)
@@ -213,10 +215,33 @@ class KanbanStore:
         return dict(row)
 
     @staticmethod
+    def _card_map(conn: sqlite3.Connection) -> dict[str, dict[str, Any]]:
+        rows = conn.execute("SELECT id,title,status,issue_type,archived_at FROM kanban_tasks").fetchall()
+        return {str(row["id"]): dict(row) for row in rows}
+
+    def _result(
+        self,
+        conn: sqlite3.Connection,
+        row: sqlite3.Row | dict[str, Any] | None,
+        *,
+        cards: dict[str, dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        task = self._row(row) if isinstance(row, sqlite3.Row) or row is None else dict(row)
+        if task.get("issue_type") == "epic":
+            task["epic_plan"] = summarize_epic_plan(task, cards if cards is not None else self._card_map(conn))
+        return task
+
+    def _assert_epic_can_close(self, conn: sqlite3.Connection, task: dict[str, Any]) -> None:
+        if task.get("issue_type") != "epic":
+            return
+        summary = summarize_epic_plan(task, self._card_map(conn))
+        if not summary["can_close"]:
+            raise KanbanValidation(blocked_message(task, summary))
+
+    @staticmethod
     def _ordered_ids(conn: sqlite3.Connection, status: str, *, without: str | None = None) -> list[str]:
         rows = conn.execute(
-            "SELECT id FROM kanban_tasks WHERE status=? AND archived_at IS NULL "
-            "ORDER BY position, created_at, id",
+            "SELECT id FROM kanban_tasks WHERE status=? AND archived_at IS NULL ORDER BY position, created_at, id",
             (status,),
         ).fetchall()
         return [row["id"] for row in rows if row["id"] != without]
@@ -247,15 +272,19 @@ class KanbanStore:
                 + " END, position, created_at, id",
                 selected,
             ).fetchall()
-        return [dict(row) for row in rows]
+            cards = self._card_map(conn)
+            return [self._result(conn, row, cards=cards) for row in rows]
 
     def get(self, task_id: str) -> dict[str, Any]:
         supplied = _text(task_id, "id", required=True)
         with self._connect() as conn:
             row = conn.execute("SELECT * FROM kanban_tasks WHERE id=?", (supplied,)).fetchone()
             compact = supplied.upper()
-            if row is None and len(compact) == 10 and compact.startswith("K-") and all(
-                character in "0123456789ABCDEF" for character in compact[2:]
+            if (
+                row is None
+                and len(compact) == 10
+                and compact.startswith("K-")
+                and all(character in "0123456789ABCDEF" for character in compact[2:])
             ):
                 matches = conn.execute(
                     "SELECT * FROM kanban_tasks WHERE id LIKE ? ORDER BY id LIMIT 2",
@@ -264,7 +293,7 @@ class KanbanStore:
                 if len(matches) > 1:
                     raise KanbanConflict("compact card_id is ambiguous; copy and use the full card_id")
                 row = matches[0] if matches else None
-            return self._row(row)
+            return self._result(conn, row)
 
     def create(
         self,
@@ -289,10 +318,18 @@ class KanbanStore:
         task_id = "kanban-" + uuid.uuid4().hex[:12]
         now = _now()
         with self._write() as conn:
+            proposed = {
+                "id": task_id,
+                "title": title,
+                "description": description,
+                "status": status,
+                "issue_type": issue_type,
+            }
+            if status == "closed":
+                self._assert_epic_can_close(conn, proposed)
             position = int(
                 conn.execute(
-                    "SELECT COALESCE(MAX(position), 0) + 1 FROM kanban_tasks "
-                    "WHERE status=? AND archived_at IS NULL",
+                    "SELECT COALESCE(MAX(position), 0) + 1 FROM kanban_tasks WHERE status=? AND archived_at IS NULL",
                     (status,),
                 ).fetchone()[0]
             )
@@ -325,9 +362,9 @@ class KanbanStore:
                         "SELECT * FROM kanban_tasks WHERE source_kind=? AND source_id=?", (source_kind, source_id)
                     ).fetchone()
                     if existing:
-                        return dict(existing)
+                        return self._result(conn, existing)
                 raise KanbanConflict("task conflicts with an existing record") from exc
-            return self._row(conn.execute("SELECT * FROM kanban_tasks WHERE id=?", (task_id,)).fetchone())
+            return self._result(conn, conn.execute("SELECT * FROM kanban_tasks WHERE id=?", (task_id,)).fetchone())
 
     def update(self, task_id: str, *, expected_version: int, **fields: Any) -> dict[str, Any]:
         values = _edits(fields)
@@ -339,13 +376,16 @@ class KanbanStore:
             if int(current["version"]) != expected_version:
                 raise KanbanConflict("task changed; reload and try again")
             if not values:
-                return current
+                return self._result(conn, current)
+            proposed = {**current, **values}
+            if proposed["status"] == "closed":
+                self._assert_epic_can_close(conn, proposed)
             sets = ", ".join(f"{key}=?" for key in values)
             conn.execute(
                 f"UPDATE kanban_tasks SET {sets}, version=version+1, updated_at=? WHERE id=?",
                 (*values.values(), _now(), task_id),
             )
-            return self._row(conn.execute("SELECT * FROM kanban_tasks WHERE id=?", (task_id,)).fetchone())
+            return self._result(conn, conn.execute("SELECT * FROM kanban_tasks WHERE id=?", (task_id,)).fetchone())
 
     def move(
         self,
@@ -368,8 +408,13 @@ class KanbanStore:
             if int(current["version"]) != expected_version:
                 raise KanbanConflict("task changed; reload and try again")
             source_status = str(current["status"])
+            proposed = {**current, **values, "status": destination_status}
+            if destination_status == "closed":
+                self._assert_epic_can_close(conn, proposed)
             source_ids = self._ordered_ids(conn, source_status, without=task_id)
-            destination_ids = source_ids if destination_status == source_status else self._ordered_ids(conn, destination_status)
+            destination_ids = (
+                source_ids if destination_status == source_status else self._ordered_ids(conn, destination_status)
+            )
             if before_id:
                 if before_id == task_id or before_id not in destination_ids:
                     raise KanbanValidation("before_id must identify another task in the destination status")
@@ -395,7 +440,7 @@ class KanbanStore:
             if destination_status != source_status:
                 self._renumber(conn, source_status, source_ids)
             self._renumber(conn, destination_status, destination_ids)
-            return self._row(conn.execute("SELECT * FROM kanban_tasks WHERE id=?", (task_id,)).fetchone())
+            return self._result(conn, conn.execute("SELECT * FROM kanban_tasks WHERE id=?", (task_id,)).fetchone())
 
     def close(self, task_id: str, *, expected_version: int, reason: str = "") -> dict[str, Any]:
         return self.move(
@@ -427,17 +472,19 @@ class KanbanStore:
                 "SELECT * FROM kanban_tasks WHERE status='closed' AND archived_at IS NULL "
                 "ORDER BY position, created_at, id"
             ).fetchall()
+            for row in rows:
+                self._assert_epic_can_close(conn, dict(row))
             ids = [row["id"] for row in rows]
             if not ids:
                 return []
             placeholders = ",".join("?" for _ in ids)
             conn.execute(
-                f"UPDATE kanban_tasks SET archived_at=?, updated_at=?, version=version+1 "
-                f"WHERE id IN ({placeholders})",
+                f"UPDATE kanban_tasks SET archived_at=?, updated_at=?, version=version+1 WHERE id IN ({placeholders})",
                 (now, now, *ids),
             )
             archived = conn.execute(
                 f"SELECT * FROM kanban_tasks WHERE id IN ({placeholders}) ORDER BY position, created_at, id",
                 ids,
             ).fetchall()
-            return [dict(row) for row in archived]
+            cards = self._card_map(conn)
+            return [self._result(conn, row, cards=cards) for row in archived]

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import importlib
+from pathlib import Path
+
+import yaml
 
 
 def test_registers_complete_plugin(plugin, registry):
@@ -84,7 +87,8 @@ def test_view_is_single_slug_aware_page(plugin):
     assert 'localStorage.setItem("simple-kanban.condensed",String(state.condensed))' in html
     assert 'board${state.condensed?" condensed":""}' in html
     assert (
-        ".board.condensed .card-description,.board.condensed .meta,.board.condensed .card-actions{display:none}" in html
+        ".board.condensed .card-description,.board.condensed .epic-links,.board.condensed .meta,.board.condensed .card-actions{display:none}"
+        in html
     )
     assert 'title.dataset.action="edit"' in html
     assert 'node("div","condensed-rank-actions")' in html
@@ -95,6 +99,11 @@ def test_view_is_single_slug_aware_page(plugin):
     assert "archiveConfirmUntil" in html
     assert 'request("/tasks/archive-closed"' in html
     assert 'request(state.archived?"/tasks?archived=true":"/tasks")' in html
+    assert "epic-badge" in html
+    assert "Epic cannot close" in html
+    assert "data-card-ref" in html
+    assert "epicLinks" in html
+    assert "--epic-purple" in html
     assert (
         "filteredTasks().sort((a,b)=>STATUSES.indexOf(a.status)-STATUSES.indexOf(b.status)||a.position-b.position)"
         in html
@@ -109,3 +118,21 @@ def test_event_is_namespaced_by_registry(plugin, registry, tmp_path):
         "changed",
         {"action": "created", "task_id": "k-1", "status": "open", "version": 1},
     )
+
+
+def test_manifest_and_readme_document_complete_v030_how_to(plugin):
+    root = Path(plugin.__file__).parent
+    manifest = yaml.safe_load((root / "protoagent.plugin.yaml").read_text())
+    readme = (root / "README.md").read_text()
+    contract = (root / "docs" / "EPIC_PLANS.md").read_text()
+    assert manifest["version"] == "0.3.0"
+    for heading in (
+        "## How to use Simple Kanban",
+        "## How to use Epic plans",
+        "### Epic syntax contract",
+        "### Close and archive protection",
+        "## Agent tools",
+    ):
+        assert heading in readme
+    assert "v0.3.0 adds no table, column, or migration" in readme
+    assert "Only exact level-two headings are interpreted" in contract

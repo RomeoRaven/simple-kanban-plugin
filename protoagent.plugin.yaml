@@ -1,6 +1,6 @@
 id: simple_kanban
 name: Simple Kanban
-version: 0.2.0
+version: 0.3.0
 description: A durable ranked List/Kanban working queue for one operator and their agent.
 enabled: false
 repository: https://github.com/RomeoRaven/simple-kanban-plugin

@@ -39,7 +39,12 @@ document.write('<link rel="stylesheet" href="'+window.__base+'/_ds/plugin-kit.cs
     <input id="task-id" type="hidden">
     <input id="task-version" type="hidden">
     <label>Title<input id="task-title" class="pl-input" maxlength="500" required></label>
-    <label>Description<textarea id="task-description" class="pl-input" rows="4" maxlength="20000"></textarea></label>
+    <label>Description<textarea id="task-description" class="pl-input" rows="8" maxlength="20000"></textarea></label>
+    <div id="epic-help" class="epic-help" hidden>
+      <strong>Epic plan</strong>
+      <span>Use <code>## Child tasks</code> for blocking card references or checkboxes, and <code>## Related cards</code> for non-blocking context.</span>
+      <button id="insert-epic-template" class="pl-btn pl-btn--sm" type="button">Insert epic template</button>
+    </div>
     <div class="form-grid">
       <label>Status<select id="task-status" class="pl-input"></select></label>
       <label>Priority<select id="task-priority" class="pl-input"><option value="0">Urgent</option><option value="1">High</option><option value="2" selected>Normal</option><option value="3">Low</option><option value="4">Someday</option></select></label>

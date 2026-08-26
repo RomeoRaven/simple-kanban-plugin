@@ -2,33 +2,178 @@
 
 A self-reliant ranked List/Kanban working queue for [protoAgent](https://github.com/protoLabsAI/protoAgent).
 
-Status: **v0.2.0 S1-dev candidate**. Public v0.1.0 remains the S1-stable release; this candidate requires live development review before any publication or stable promotion.
+Status: **v0.3.0 S1-dev candidate**. Public v0.2.0 remains the accepted release; this candidate requires live development review before publication or Stable promotion.
 
 ## What it provides
 
-- Native primary-rail **Kanban** view with Board and List modes.
+- Native primary-rail **Kanban** view with Board, List, and Archived modes.
 - Five durable states: Open, In progress, Blocked, Deferred, and Closed.
-- Atomic same-column rank and cross-column move operations.
-- Individually collapsible vertical status columns with the layout preference retained in the browser.
-- Board-wide **Condensed** mode that retains each card's drag handle, compact copyable ID, clickable title, and earlier/later controls; the preference is retained in the browser.
-- Drag/drop plus status selectors and earlier/later controls for keyboard, screen-reader, and mobile fallback.
-- Create, edit, move, close, reopen, and delete controls.
-- Compact `K-XXXXXXXX` card references with one-click copy of the complete durable `card_id`; either form supports direct agent lookup when unique.
-- Non-destructive **Archive all** for Closed cards with an explicit second-click confirmation plus a read-only Archived view.
-- Search, optimistic move display, stale-write conflict detection, rollback, and authoritative refresh.
-- Eight namespaced agent tools, including exact-card lookup and bulk Closed archival.
+- Atomic same-column ranking and cross-column movement.
+- Drag/drop plus status selectors and earlier/later controls for keyboard, screen-reader, and mobile use.
+- Individually collapsible status columns and a browser-persisted Board-wide **Condensed** mode.
+- Create, edit, move, close, reopen, delete, and non-destructive bulk archival.
+- Compact `K-XXXXXXXX` references with one-click copy of the complete durable `kanban-…` ID.
+- Purple **EPIC** cards with schema-free Markdown plans, child-task progress, related-card references, and server-enforced close/archive protection.
+- Eight namespaced agent tools with optimistic-version protection.
 - Plugin-owned SQLite state under the active protoAgent instance root; no core schema edits or private plugin imports.
 - A `simple_kanban.changed` event hint after committed mutations.
 
-This is deliberately separate from protoAgent core Tasks and the Project Board coding-orchestration plugin. It is a lightweight daily queue, not a repository orchestration system.
+Simple Kanban is deliberately separate from protoAgent core Tasks and the Project Board coding-orchestration plugin. It is a lightweight operator-agent queue, not a repository orchestration system.
+
+## How to use Simple Kanban
+
+### Open the board
+
+Select **Kanban** from protoAgent's primary rail. The toolbar provides:
+
+- **Board** — cards grouped into status columns.
+- **List** — the same active records in ranked tabular form.
+- **Condensed** — Board-only dense cards retaining identity, title, rank controls, and Epic state.
+- **Archived** — read-only records removed from the active queue.
+- **Refresh** — reload authoritative server state.
+- **+ Task** — create a card.
+
+Search matches title, description, assignee, type, and full card ID.
+
+### Create or edit a card
+
+Select **+ Task**, or select an existing card title. Each card has:
+
+- **Title** and **Description**.
+- **Status**: Open, In progress, Blocked, Deferred, or Closed.
+- **Priority**: Urgent through Someday. Priority is importance; it does not change manual rank.
+- **Type**: task, bug, feature, chore, or epic.
+- **Assignee**.
+
+Save writes with optimistic concurrency. If another operator or agent changed the card first, the stale write is rejected and the board reloads rather than overwriting newer work.
+
+### Rank and move cards
+
+- Drag only from the card's drag handle.
+- Drop before a card for exact insertion or into a column to append.
+- Use the up/down controls when drag is unsuitable.
+- Use the status selector as the keyboard, screen-reader, and mobile fallback.
+
+Rank is local to each status column. A status move and its destination rank commit in one transaction.
+
+### Reference a card
+
+Every card displays a compact `K-XXXXXXXX` token. Its copy button copies the complete durable ID, for example:
+
+```text
+kanban-123456789abc
+```
+
+Agents should mutate by the complete ID. A unique compact token can be used for direct lookup; ambiguous compact tokens are rejected.
+
+Inside descriptions, write a full reference as:
+
+```markdown
+[[kanban-123456789abc]]
+```
+
+The UI renders a recognized reference as a compact clickable card chip. Selecting it opens an active card or locates an archived card.
+
+## How to use Epic plans
+
+An Epic is a larger outcome whose plan remains ordinary text in the existing Description field. Simple Kanban does not add parent, relationship, order, or progress columns to its database.
+
+Set **Type** to `epic`. The purple **EPIC** label distinguishes the card in Board, List, Condensed, and Archived views. The editor's **Insert epic template** action can add the supported headings.
+
+Recommended plan:
+
+```markdown
+## Outcome
+
+Deliver Google Workspace as an accepted AO Common capability.
+
+## Plan
+
+1. Establish the OAuth and scope boundary.
+2. Qualify provider behavior.
+3. Decide whether to include it in AO Common.
+
+## Child tasks
+
+- [[kanban-123456789abc]] — Define OAuth scopes
+- [[kanban-23456789abcd]] — Qualify Gmail and Drive
+- [ ] Write the operator acceptance notes
+- [x] Record the already accepted provider boundary
+
+## Related cards
+
+- [[kanban-3456789abcde]] — Calendar owns human events; Google owns provider operations
+
+## Deferred follow-up
+
+- Consider notification integration after provider adoption
+
+## Acceptance
+
+- Approved OAuth boundary
+- Provider behavior proven
+- Inclusion decision recorded
+```
+
+### Epic syntax contract
+
+Only these exact level-two headings have special meaning:
+
+- `## Child tasks` — blocking work.
+- `## Related cards` — non-blocking peer context.
+- `## Deferred follow-up` — non-blocking future work.
+
+Under `## Child tasks`:
+
+- A bullet containing `[[kanban-…]]` derives completion from that card's real status. A manual checkbox beside a card reference is ignored.
+- An unlinked `- [ ]` item is an open inline task.
+- An unlinked `- [x]` item is a completed inline task.
+- A missing, malformed, placeholder, or self-referencing child card is a broken reference.
+
+References under `## Related cards`, prose elsewhere, and Deferred follow-up items never block completion.
+
+### Close and archive protection
+
+An Epic cannot enter Closed while it has:
+
+- an Open, In progress, Blocked, or Deferred linked child card;
+- an unchecked inline child task;
+- a missing child-card reference; or
+- a self-reference.
+
+The guard runs in the server store, so Board drag/drop, status selection, the close button, JSON API calls, and agent tools follow the same rule. The card reports completed/total children, open children, broken references, and related-card count without persisting derived relationship data.
+
+Bulk **Archive all** is atomic. If a legacy Closed Epic still has open or broken child items, the whole archive request is rejected and no Closed cards are archived. Resolve the child work, remove it from `## Child tasks`, or move it to a non-blocking section before retrying.
+
+## Close, reopen, archive, and delete
+
+- **Close** preserves terminal time and reason.
+- **Reopen** returns the card to Open and clears stale close metadata.
+- **Archive all** requires a second click and moves every eligible active Closed card into Archived without deleting records.
+- **Delete** permanently removes one card and repairs the affected column rank. Prefer Close/Archive for completed work.
+
+Archived cards remain addressable by exact ID but are read-only.
+
+## Agent tools
+
+- `simple_kanban_task_create`
+- `simple_kanban_task_list`
+- `simple_kanban_task_get`
+- `simple_kanban_task_update`
+- `simple_kanban_task_move`
+- `simple_kanban_task_close`
+- `simple_kanban_task_delete`
+- `simple_kanban_closed_archive`
+
+Agents should list/get first, preserve the returned `version`, and pass it as `expected_version` on every mutation. Epic close/archive guards apply to tools exactly as they do to the UI.
 
 ## Compatibility
 
 - protoAgent `>=0.147.0`
 - Python `>=3.11`
-- No third-party runtime dependencies beyond libraries provided by the host
+- No third-party runtime dependencies beyond host-provided libraries
 
-The selected v0.147.0 host documents `infra.paths.instance_paths()` as its instance-store invariant. Simple Kanban uses that exact host seam and keeps its database at `simple_kanban/simple_kanban.db` under the active instance root. Upstream issue #1 remains open for an explicit long-term external-plugin persistence contract.
+The selected host documents `infra.paths.instance_paths()` as its instance-store invariant. Simple Kanban keeps its database at `simple_kanban/simple_kanban.db` under the active instance root. Upstream issue #1 remains open for a long-term external-plugin persistence contract.
 
 ## Install
 
@@ -36,7 +181,7 @@ The selected v0.147.0 host documents `infra.paths.instance_paths()` as its insta
 python -m server plugin install https://github.com/RomeoRaven/simple-kanban-plugin --ref <exact-ref>
 ```
 
-CLI installation is fetch-only. Enable `simple_kanban` explicitly in the selected instance's `plugins.enabled`, then restart or reload that instance. Git installation records the resolved commit in `plugins.lock`.
+Installation is fetch-only. Add `simple_kanban` to the selected instance's `plugins.enabled`, then restart or reload that instance. Git installation records the resolved commit in `plugins.lock`.
 
 ## Development
 
@@ -44,22 +189,25 @@ CLI installation is fetch-only. Enable `simple_kanban` explicitly in the selecte
 python -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/ruff check .
-.venv/bin/ruff format --check tests/
+.venv/bin/ruff format --check .
 .venv/bin/pytest -q
+node --check view/board.js
 ```
 
 ## Data model
 
-Each task owns a stable ID, title, description, status, dense per-status position, optimistic-concurrency version, priority, issue type, assignee, lifecycle timestamps, close/archive metadata, and optional source identity. Every move runs in one SQLite transaction and renumbers affected columns before commit. Archival is distinct from deletion: it atomically timestamps every active Closed card, keeps the complete records addressable by `card_id`, and removes them from the active Board/List.
+Each task owns a stable ID, title, description, status, dense per-status position, optimistic-concurrency version, priority, issue type, assignee, lifecycle timestamps, close/archive metadata, and optional source identity. Every move runs in one SQLite transaction.
+
+Epic structure remains text in `description`. Child and related references, inline checkboxes, progress, and completion eligibility are parsed and resolved at read/mutation time; v0.3.0 adds no table, column, or migration.
 
 ## Platform status
 
 | Platform | Status | Evidence / follow-up |
 |---|---|---|
-| Linux source | Tested | Store/API/registration/concurrency tests, Ruff, manifest and JS syntax checks |
-| S1-dev | Pending v0.2.0 live acceptance | Exact candidate deployment and Dennis review |
-| S1-stable | v0.1.0 tested | v0.2.0 requires separate promotion after acceptance |
-| Windows | Not tested | Deferred; no PC1 work in this tranche |
+| Linux source | Candidate tested | Store/API/parser/registration/concurrency tests, Ruff, manifest, and JS syntax |
+| S1-dev | Pending v0.3.0 live review | Exact candidate deployment and Dennis acceptance |
+| S1-stable | v0.2.0 accepted | Stable remains unchanged until separate release/promotion approval |
+| Windows | Not tested | Route only an accepted candidate to PC1/PLA |
 
 ## License
 

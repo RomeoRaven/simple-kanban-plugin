@@ -17,7 +17,8 @@ def client_for(plugin, tmp_path):
 
 def test_api_crud_and_conflict(plugin, tmp_path):
     client = client_for(plugin, tmp_path)
-    assert client.get("/api/plugins/simple_kanban/status").json()["integrity"] == "ok"
+    status = client.get("/api/plugins/simple_kanban/status").json()
+    assert status["integrity"] == "ok" and status["version"] == "0.3.0" and status["schema"] == 2
     created = client.post("/api/plugins/simple_kanban/tasks", json={"title": "API task"})
     assert created.status_code == 201
     task = created.json()["task"]
@@ -119,3 +120,22 @@ def test_api_archives_all_closed_and_preserves_card_lookup(plugin, tmp_path):
     exact = client.get(f"/api/plugins/simple_kanban/tasks/{closed[0]['id']}").json()["task"]
     assert exact["archived_at"] and exact["id"] == closed[0]["id"]
     assert client.post("/api/plugins/simple_kanban/tasks/archive-closed").json()["archived"] == 0
+
+
+def test_api_returns_epic_summary_and_blocks_close(plugin, tmp_path):
+    client = client_for(plugin, tmp_path)
+    epic = client.post(
+        "/api/plugins/simple_kanban/tasks",
+        json={
+            "title": "API epic",
+            "issue_type": "epic",
+            "description": "## Child tasks\n- [ ] API child",
+        },
+    ).json()["task"]
+    assert epic["epic_plan"]["open_children"] == 1
+    blocked = client.post(
+        f"/api/plugins/simple_kanban/tasks/{epic['id']}/close",
+        json={"expected_version": epic["version"]},
+    )
+    assert blocked.status_code == 422
+    assert "1 open child task" in blocked.json()["detail"]
