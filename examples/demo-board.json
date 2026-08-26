@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "source_kind": "simple-kanban-demo",
+  "cards": [
+    {
+      "key": "task",
+      "source_id": "ordinary-task",
+      "title": "DEMO · Task — Draft the release notes",
+      "description": "A Task is one small, independently completable unit of work.\n\nUse it when the card can move through the board without needing its own plan.\n\nAcceptance:\n- Summarize the operator-visible changes\n- Link the qualification evidence",
+      "status": "open",
+      "priority": 2,
+      "issue_type": "task",
+      "assignee": "hermes-pa"
+    },
+    {
+      "key": "bug",
+      "source_id": "bug-card",
+      "title": "DEMO · Bug — Mobile filter resets after refresh",
+      "description": "A Bug records behavior that differs from the intended result.\n\nReproduce:\n1. Select a board filter on mobile\n2. Refresh the view\n3. Observe the filter reset\n\nExpected: the selected filter remains active.\nActual: the board returns to the default filter.",
+      "status": "blocked",
+      "priority": 0,
+      "issue_type": "bug",
+      "assignee": "Dennis"
+    },
+    {
+      "key": "feature",
+      "source_id": "feature-card",
+      "title": "DEMO · Feature — Save named board filters",
+      "description": "A Feature adds a new operator capability.\n\nOutcome: operators can save, select, rename, and remove reusable board filters.\n\nThis card is In progress to demonstrate an active feature lane.",
+      "status": "in_progress",
+      "priority": 1,
+      "issue_type": "feature",
+      "assignee": "hermes-pa"
+    },
+    {
+      "key": "chore",
+      "source_id": "chore-card",
+      "title": "DEMO · Chore — Refresh README screenshots",
+      "description": "A Chore is maintenance that keeps the plugin clear and supportable without changing product behavior.\n\nDeferred means the work is intentionally retained for later rather than currently blocked.",
+      "status": "deferred",
+      "priority": 3,
+      "issue_type": "chore",
+      "assignee": "hermes-pa"
+    },
+    {
+      "key": "child_contract",
+      "source_id": "epic-child-contract",
+      "title": "DEMO · Epic child — Define the acceptance contract",
+      "description": "Completed child card for the demonstration Epic.\n\nThe Epic derives this item's completion from the real Closed status, not from a checkbox in the plan.",
+      "status": "closed",
+      "priority": 2,
+      "issue_type": "task",
+      "assignee": "hermes-pa"
+    },
+    {
+      "key": "child_references",
+      "source_id": "epic-child-references",
+      "title": "DEMO · Epic child — Build clickable references",
+      "description": "In-progress child card for the demonstration Epic.\n\nIts full durable ID is referenced from the Epic description and rendered there as a clickable chip.",
+      "status": "in_progress",
+      "priority": 1,
+      "issue_type": "task",
+      "assignee": "hermes-pa"
+    },
+    {
+      "key": "child_mobile",
+      "source_id": "epic-child-mobile",
+      "title": "DEMO · Epic child — Complete mobile review",
+      "description": "Open child card for the demonstration Epic.\n\nClosing the Epic remains blocked until this and every other blocking child are Closed.",
+      "status": "open",
+      "priority": 2,
+      "issue_type": "task",
+      "assignee": "hermes-pa"
+    },
+    {
+      "key": "epic",
+      "source_id": "epic-card",
+      "title": "DEMO · Epic — Deliver the guided Kanban experience",
+      "description": "## Outcome\n\nShow how a larger outcome can be planned without adding relationship tables or hierarchy fields.\n\n## Plan\n\n1. Define the acceptance contract.\n2. Build durable clickable references.\n3. Complete desktop and mobile review.\n\n## Child tasks\n\n- [ ] [[{{child_contract}}]] — Define the acceptance contract\n- [ ] [[{{child_references}}]] — Build clickable references\n- [ ] [[{{child_mobile}}]] — Complete mobile review\n- [ ] Dennis accepts the guided Epic workflow\n\n## Related cards\n\n- [[{{feature}}]] — Shows an independently tracked product feature\n- [[{{bug}}]] — Shows non-blocking related defect context\n\n## Deferred follow-up\n\n- Consider adapting the examples after future product changes\n\n## Acceptance\n\n- Every child card is Closed\n- The inline Dennis acceptance item is checked\n- Purple EPIC state and reference chips are understandable in Board, List, and mobile views",
+      "status": "open",
+      "priority": 1,
+      "issue_type": "epic",
+      "assignee": "Dennis"
+    }
+  ]
+}

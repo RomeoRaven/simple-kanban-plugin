@@ -77,6 +77,8 @@ Default statuses: `open`, `in_progress`, `blocked`, `deferred`, `closed`.
 - Linked child status, inline checkboxes, related counts, and reference integrity are derived at read time.
 - A purple text-labeled EPIC indicator remains visible across Board, Condensed, List, and Archived views.
 - Store-level guards reject incomplete Epic closure and atomically reject bulk archival when a legacy Closed Epic is still incomplete.
+- Destructive UI actions use a plugin-owned accessible confirmation dialog; sandbox-dependent browser-native dialogs are not part of the contract.
+- A versioned repository demo template is inert by default and can be explicitly loaded, reset, or removed only within its exact source namespace.
 
 ## Self-reliant architecture
 
@@ -85,12 +87,14 @@ simple-kanban-plugin/
   protoagent.plugin.yaml
   __init__.py
   store.py
+  demo.py
   api.py
   tools.py
   view/
     tasks.html
     tasks.js
     tasks.css
+  examples/demo-board.json
   skills/simple-kanban/SKILL.md
   tests/
   README.md
@@ -115,6 +119,7 @@ Gated plugin-owned routes under `/api/plugins/simple_kanban`:
 - close/reopen;
 - atomic move/reorder;
 - bulk Closed archival and archived-card listing;
+- opt-in demonstration status/load/reset/remove operations scoped to `simple-kanban-demo`;
 - optional one-time import preview/execute.
 
 Public page route: `/plugins/simple_kanban/view`.

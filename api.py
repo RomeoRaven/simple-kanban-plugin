@@ -7,6 +7,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, HTTPException, Query
 
+from . import demo
 from .events import emit_changed
 from .store import STATUSES, KanbanConflict, KanbanError, KanbanNotFound, KanbanStore, KanbanValidation
 
@@ -52,6 +53,46 @@ def build_data_router():
         archived: Annotated[bool, Query()] = False,
     ):
         return {"tasks": _run(lambda: store().list(status, archived=archived)), "statuses": list(STATUSES)}
+
+    @router.get("/demo")
+    def demo_status():
+        return _run(lambda: demo.status(store()))
+
+    @router.post("/demo/load")
+    def load_demo():
+        result = _run(lambda: demo.load(store()))
+        for task in result["created"]:
+            emit_changed("demo_created", task)
+        return {
+            "created": len(result["created"]),
+            "task_ids": [task["id"] for task in result["created"]],
+            "demo": result["status"],
+        }
+
+    @router.post("/demo/reset")
+    def reset_demo():
+        result = _run(lambda: demo.reset(store()))
+        for task in result["removed"]:
+            emit_changed("demo_deleted", task)
+        for task in result["created"]:
+            emit_changed("demo_created", task)
+        return {
+            "removed": len(result["removed"]),
+            "created": len(result["created"]),
+            "task_ids": [task["id"] for task in result["created"]],
+            "demo": result["status"],
+        }
+
+    @router.delete("/demo")
+    def remove_demo():
+        result = _run(lambda: demo.remove(store()))
+        for task in result["removed"]:
+            emit_changed("demo_deleted", task)
+        return {
+            "removed": len(result["removed"]),
+            "task_ids": [task["id"] for task in result["removed"]],
+            "demo": result["status"],
+        }
 
     @router.get("/tasks/{task_id}")
     def get_task(task_id: str):

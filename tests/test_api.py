@@ -139,3 +139,22 @@ def test_api_returns_epic_summary_and_blocks_close(plugin, tmp_path):
     )
     assert blocked.status_code == 422
     assert "1 open child task" in blocked.json()["detail"]
+
+
+def test_api_demo_is_explicit_idempotent_resettable_and_removable(plugin, tmp_path):
+    client = client_for(plugin, tmp_path)
+    user = client.post("/api/plugins/simple_kanban/tasks", json={"title": "Operator card"}).json()["task"]
+    initial = client.get("/api/plugins/simple_kanban/demo").json()
+    assert initial["present_count"] == 0 and initial["expected_count"] == 8
+
+    loaded = client.post("/api/plugins/simple_kanban/demo/load").json()
+    assert loaded["created"] == 8 and loaded["demo"]["complete"] is True
+    assert client.post("/api/plugins/simple_kanban/demo/load").json()["created"] == 0
+
+    reset = client.post("/api/plugins/simple_kanban/demo/reset").json()
+    assert reset["removed"] == 8 and reset["created"] == 8
+    assert client.get(f"/api/plugins/simple_kanban/tasks/{user['id']}").status_code == 200
+
+    removed = client.delete("/api/plugins/simple_kanban/demo").json()
+    assert removed["removed"] == 8 and removed["demo"]["present_count"] == 0
+    assert client.get(f"/api/plugins/simple_kanban/tasks/{user['id']}").status_code == 200

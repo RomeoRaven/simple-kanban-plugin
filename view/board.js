@@ -28,7 +28,11 @@ const content = document.getElementById("content");
 const notice = document.getElementById("notice");
 const dialog = document.getElementById("task-dialog");
 const form = document.getElementById("task-form");
+const demoDialog = document.getElementById("demo-dialog");
+const confirmDialog = document.getElementById("confirm-dialog");
 let loadGeneration = 0;
+let confirmation = null;
+let demoBusy = false;
 
 function node(tag, cls, text) {
   const element = document.createElement(tag);
@@ -51,6 +55,17 @@ async function request(path, options={}) {
     const error = new Error(detail); error.status = response.status; throw error;
   }
   return response.status === 204 ? null : response.json();
+}
+function settleConfirmation(value) {
+  if(!confirmation)return;
+  const pending=confirmation;confirmation=null;if(confirmDialog.open)confirmDialog.close();pending.resolve(value);if(pending.returnFocus?.isConnected)pending.returnFocus.focus();
+}
+function requestConfirmation({title,message:copy,confirmLabel="Confirm",danger=false}) {
+  if(confirmation)return Promise.resolve(false);
+  document.getElementById("confirm-title").textContent=title;
+  document.getElementById("confirm-message").textContent=copy;
+  const accept=document.getElementById("confirm-accept");const cancel=document.getElementById("confirm-cancel");accept.textContent=confirmLabel;accept.classList.toggle("danger-action",danger);
+  return new Promise((resolve)=>{confirmation={resolve,returnFocus:document.activeElement};try{confirmDialog.showModal();(danger?cancel:accept).focus();}catch{confirmation=null;resolve(false);}});
 }
 function filteredTasks() {
   const query = state.query.toLocaleLowerCase();
@@ -245,8 +260,8 @@ function openDialog(task=null){
   document.getElementById("dialog-title").textContent=task?"Edit task":"New task";document.getElementById("task-id").value=task?.id||"";document.getElementById("task-version").value=task?.version||"";document.getElementById("task-title").value=task?.title||"";document.getElementById("task-description").value=task?.description||"";document.getElementById("task-status").value=task?.status||"open";document.getElementById("task-priority").value=String(task?.priority??2);document.getElementById("task-type").value=task?.issue_type||"task";document.getElementById("task-assignee").value=task?.assignee||"";updateEpicHelp();dialog.showModal();document.getElementById("task-title").focus();
 }
 function updateEpicHelp(){document.getElementById("epic-help").hidden=document.getElementById("task-type").value!=="epic";}
-function insertEpicTemplate(){
-  const field=document.getElementById("task-description");if(field.value.trim()&&!confirm("Append the Epic plan template to the current description?"))return;
+async function insertEpicTemplate(){
+  const field=document.getElementById("task-description");if(field.value.trim()&&!await requestConfirmation({title:"Append Epic template?",message:"The Epic plan template will be appended to the current description. Existing text will remain unchanged.",confirmLabel:"Append template"}))return;
   const template="## Outcome\n\nDescribe the larger outcome.\n\n## Plan\n\n1. Describe the intended order.\n\n## Child tasks\n\n- [ ] Describe an inline task\n- [ ] Add a child card: [[kanban-REPLACE-ME]] — replace the placeholder with its full ID\n\n## Related cards\n\n- [[kanban-REPLACE-ME]] — Explain the relationship\n\n## Deferred follow-up\n\n- Describe non-blocking future work\n\n## Acceptance\n\n- Define completion.";
   field.value=`${field.value.trim()}${field.value.trim()?"\n\n":""}${template}`;field.focus();field.setSelectionRange(field.value.length,field.value.length);
 }
@@ -264,7 +279,7 @@ async function simpleAction(task,action){
   if(action==="earlier"||action==="later"){const column=rankedTasks(task.status);const index=column.findIndex((x)=>x.id===task.id);let before=null;if(action==="earlier"&&index>0)before=column[index-1].id;else if(action==="later"&&index<column.length-1)before=column[index+2]?.id||null;else return;await moveTask(task.id,task.status,before);return;}
   if(state.moving){message("A task change is already saving");return;}
   if(action==="close"&&epicCannotClose(task)){message(epicBlockMessage(task),true);return;}
-  if(action==="delete"&&!confirm(`Delete “${task.title}”?`))return;
+  if(action==="delete"&&!await requestConfirmation({title:"Delete task?",message:`Delete “${task.title}” permanently? Closing or archiving is safer for completed work.`,confirmLabel:"Delete task",danger:true}))return;
   state.moving=true;let applied=false;render();message("Saving change…");
   try{
     if(action==="close")await request(`/tasks/${encodeURIComponent(task.id)}/close`,{method:"POST",body:JSON.stringify({expected_version:task.version,reason:"Closed from Kanban"})});
@@ -292,11 +307,39 @@ async function followCardReference(cardId){
     const visible=document.querySelector(`[data-id="${CSS.escape(cardId)}"]`);if(visible){visible.classList.add("reference-target");visible.scrollIntoView({block:"center",behavior:"smooth"});setTimeout(()=>visible.classList.remove("reference-target"),1800);}
   }catch(error){message(`Card reference failed: ${error.message}`,true);}
 }
+function setDemoBusy(busy){
+  demoBusy=busy;for(const id of ["demo-load","demo-reset","demo-remove","demo-cancel","demo-close-x"]){document.getElementById(id).disabled=busy;}
+}
+function renderDemoStatus(data){
+  const status=document.getElementById("demo-status");status.textContent=data.complete?`Demo loaded: ${data.present_count}/${data.expected_count} example cards are present.`:(data.present_count?`Partial demo: ${data.present_count}/${data.expected_count} example cards are present. Load adds missing cards; Reset replaces all demo-owned cards.`:"Demo is not loaded. Your current cards will remain unchanged.");
+  document.getElementById("demo-load").disabled=demoBusy||data.complete;
+  document.getElementById("demo-reset").disabled=demoBusy||data.present_count===0;
+  document.getElementById("demo-remove").disabled=demoBusy||data.present_count===0;
+}
+async function refreshDemoStatus(){
+  const data=await request("/demo");renderDemoStatus(data);return data;
+}
+async function openDemoDialog(){
+  if(state.moving||state.saving||demoBusy)return;demoDialog.showModal();setDemoBusy(true);document.getElementById("demo-status").textContent="Checking demonstration state…";
+  try{await refreshDemoStatus();}catch(error){document.getElementById("demo-status").textContent=`Demo status failed: ${error.message}`;}finally{setDemoBusy(false);try{const data=await request("/demo");renderDemoStatus(data);}catch{/* prior message remains */}}
+}
+async function demoAction(action){
+  if(demoBusy||state.moving||state.saving)return;
+  if(action==="reset"&&!await requestConfirmation({title:"Reset demonstration cards?",message:"Only cards owned by the simple-kanban-demo namespace will be deleted and recreated from the current repository template. Any edits to those demo cards will be lost.",confirmLabel:"Reset demo",danger:true}))return;
+  if(action==="remove"&&!await requestConfirmation({title:"Remove demonstration cards?",message:"Delete every card owned by the simple-kanban-demo namespace? Ordinary cards will not be changed.",confirmLabel:"Remove demo",danger:true}))return;
+  setDemoBusy(true);state.moving=true;render();message(`${action==="load"?"Loading":action==="reset"?"Resetting":"Removing"} demonstration cards…`);
+  try{
+    const options=action==="remove"?{method:"DELETE"}:{method:"POST"};const path=action==="load"?"/demo/load":action==="reset"?"/demo/reset":"/demo";const result=await request(path,options);await load({quiet:true,required:true});renderDemoStatus(result.demo);message(action==="remove"?`${result.removed} demonstration card${result.removed===1?"":"s"} removed`:action==="reset"?`Demo reset with ${result.created} example cards`:`${result.created} missing demonstration card${result.created===1?"":"s"} loaded`);
+  }catch(error){message(`Demo ${action} failed: ${error.message}`,true);try{await load({quiet:true,required:true});await refreshDemoStatus();}catch{/* main error remains */}}
+  finally{state.moving=false;setDemoBusy(false);render();try{await refreshDemoStatus();}catch{/* action result already reported */}}
+}
 function subscribeToChanges(){
   window.addEventListener("message",(event)=>{if(event.source===window.parent&&event.data?.type==="protoagent:event"&&event.data.topic==="simple_kanban.changed")void load({quiet:true});});
   if(window.parent!==window)window.parent.postMessage({type:"protoagent:subscribe",patterns:["simple_kanban.changed"]},"*");
 }
 content.addEventListener("click",(event)=>{const copy=event.target.closest("button[data-copy-id]");if(copy){void copyCardId(copy.dataset.copyId);return;}const reference=event.target.closest("button[data-card-ref]");if(reference){void followCardReference(reference.dataset.cardRef);return;}const button=event.target.closest("button[data-action]");if(!button)return;const owner=button.closest("[data-id]");const task=taskById(owner?.dataset.id);if(task)void simpleAction(task,button.dataset.action);});
 for(const status of STATUSES){const option=node("option","",LABELS[status]);option.value=status;document.getElementById("task-status").append(option);}
+document.getElementById("confirm-cancel").addEventListener("click",()=>settleConfirmation(false));document.getElementById("confirm-accept").addEventListener("click",()=>settleConfirmation(true));confirmDialog.addEventListener("cancel",(event)=>{event.preventDefault();settleConfirmation(false);});
+document.getElementById("demo-board").addEventListener("click",()=>void openDemoDialog());document.getElementById("demo-cancel").addEventListener("click",()=>{if(!demoBusy)demoDialog.close();});document.getElementById("demo-close-x").addEventListener("click",()=>{if(!demoBusy)demoDialog.close();});document.getElementById("demo-load").addEventListener("click",()=>void demoAction("load"));document.getElementById("demo-reset").addEventListener("click",()=>void demoAction("reset"));document.getElementById("demo-remove").addEventListener("click",()=>void demoAction("remove"));demoDialog.addEventListener("cancel",(event)=>{if(demoBusy)event.preventDefault();});
 document.getElementById("add-task").addEventListener("click",()=>openDialog());document.getElementById("refresh").addEventListener("click",()=>void load());document.getElementById("condensed-mode").addEventListener("click",toggleCondensed);document.getElementById("show-archive").addEventListener("click",()=>void toggleArchive());document.getElementById("board-mode").addEventListener("click",()=>{state.mode="board";localStorage.setItem("simple-kanban.mode",state.mode);render();});document.getElementById("list-mode").addEventListener("click",()=>{state.mode="list";localStorage.setItem("simple-kanban.mode",state.mode);render();});document.getElementById("search").addEventListener("input",(event)=>{state.query=event.target.value;render();});document.getElementById("task-type").addEventListener("change",updateEpicHelp);document.getElementById("insert-epic-template").addEventListener("click",insertEpicTemplate);document.getElementById("cancel").addEventListener("click",()=>{if(!state.saving)dialog.close();});document.getElementById("cancel-x").addEventListener("click",()=>{if(!state.saving)dialog.close();});dialog.addEventListener("cancel",(event)=>{if(state.saving)event.preventDefault();});form.addEventListener("submit",saveTask);window.addEventListener("focus",()=>void load({quiet:true}));subscribeToChanges();setInterval(()=>{if(document.visibilityState==="visible"&&(!dialog.open||state.needsRefresh))void load({quiet:true});},15000);
 await load();

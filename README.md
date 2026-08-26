@@ -31,6 +31,7 @@ Select **Kanban** from protoAgent's primary rail. The toolbar provides:
 - **Condensed** — Board-only dense cards retaining identity, title, rank controls, and Epic state.
 - **Archived** — read-only records removed from the active queue.
 - **Refresh** — reload authoritative server state.
+- **Demo** — inspect, explicitly load, reset, or remove the repository's optional example board.
 - **+ Task** — create a card.
 
 Search matches title, description, assignee, type, and full card ID.
@@ -145,12 +146,27 @@ The guard runs in the server store, so Board drag/drop, status selection, the cl
 
 Bulk **Archive all** is atomic. If a legacy Closed Epic still has open or broken child items, the whole archive request is rejected and no Closed cards are archived. Resolve the child work, remove it from `## Child tasks`, or move it to a non-blocking section before retrying.
 
+## Optional demonstration board
+
+The repository includes `examples/demo-board.json`, an eight-card example covering all five card types, all five statuses, priorities, assignees, ranking, durable references, and an incomplete Epic with linked and inline child work.
+
+Nothing is inserted at install, startup, or update time. Select **Demo** and then **Load demo** to opt in. The operations are namespace-scoped:
+
+- **Load demo** creates only missing cards and preserves every existing demo edit.
+- **Reset demo** requires confirmation, removes only `source_kind=simple-kanban-demo` cards, and recreates them from the currently installed template.
+- **Remove demo** requires confirmation and deletes only that exact demo namespace, including archived examples.
+- Ordinary user cards are never selected by title or prefix and are not changed by any demo operation.
+
+Stable per-example `source_id` values make Load idempotent. Generated durable card IDs are inserted into the Epic after its child and related cards exist; IDs are never copied from another installation. Updating the plugin updates the bundled template but does not mutate already-loaded demo cards. Use **Reset demo** only when you deliberately want the installed template to replace demo edits.
+
+See [`docs/DEMO_BOARD.md`](docs/DEMO_BOARD.md) for the complete lifecycle and API contract.
+
 ## Close, reopen, archive, and delete
 
 - **Close** preserves terminal time and reason.
 - **Reopen** returns the card to Open and clears stale close metadata.
 - **Archive all** requires a second click and moves every eligible active Closed card into Archived without deleting records.
-- **Delete** permanently removes one card and repairs the affected column rank. Prefer Close/Archive for completed work.
+- **Delete** opens a plugin-owned confirmation dialog, then permanently removes one card and repairs the affected column rank. Cancel or Escape makes no request. Prefer Close/Archive for completed work.
 
 Archived cards remain addressable by exact ID but are read-only.
 

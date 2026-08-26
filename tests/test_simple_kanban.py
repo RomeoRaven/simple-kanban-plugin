@@ -104,6 +104,13 @@ def test_view_is_single_slug_aware_page(plugin):
     assert "data-card-ref" in html
     assert "epicLinks" in html
     assert "--epic-purple" in html
+    assert "confirm(" not in html
+    assert 'id="confirm-dialog"' in html
+    assert "requestConfirmation" in html
+    assert 'id="demo-dialog"' in html
+    assert 'id="demo-board"' in html
+    assert 'request("/demo/load"' not in html  # path is selected explicitly at action time
+    assert 'action==="load"?"/demo/load"' in html
     assert (
         "filteredTasks().sort((a,b)=>STATUSES.indexOf(a.status)-STATUSES.indexOf(b.status)||a.position-b.position)"
         in html

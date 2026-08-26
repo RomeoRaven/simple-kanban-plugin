@@ -21,6 +21,8 @@ Use the `simple_kanban_*` tools when the operator wants a lightweight ranked wor
 - Use type `epic` when one card owns a larger outcome and plan. Keep the plan in the description under exact `## Child tasks`, `## Related cards`, and `## Deferred follow-up` headings.
 - Reference cards with their complete `[[kanban-…]]` ID. Under Child tasks, linked-card status and unchecked inline `- [ ]` items block Epic closure; Related cards and Deferred follow-up never block it.
 - Do not claim an Epic is complete or attempt to bypass the guard while `epic_plan.can_close` is false. Resolve, complete, remove, or deliberately defer the blocking item first.
+- Cards with `source_kind=simple-kanban-demo` are editable examples, not automatically real project work. Do not infer priorities or execution requests from them.
+- Demo Load, Reset, and Remove are explicit operator actions in the Kanban **Demo** dialog. Never reset or remove demo-owned cards without a direct request; those operations intentionally discard demo edits but never select ordinary cards.
 
 ## Tools
 

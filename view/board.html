@@ -26,6 +26,7 @@ document.write('<link rel="stylesheet" href="'+window.__base+'/_ds/plugin-kit.cs
       <button id="condensed-mode" class="pl-btn pl-btn--sm" type="button" aria-pressed="false" title="Show only card IDs and titles on Board">Condensed</button>
       <button id="show-archive" class="pl-btn pl-btn--sm" type="button" aria-pressed="false">Archived</button>
       <button id="refresh" class="pl-btn pl-btn--sm" type="button">Refresh</button>
+      <button id="demo-board" class="pl-btn pl-btn--sm" type="button">Demo</button>
       <button id="add-task" class="pl-btn pl-btn--primary" type="button">+ Task</button>
     </div>
   </header>
@@ -53,6 +54,32 @@ document.write('<link rel="stylesheet" href="'+window.__base+'/_ds/plugin-kit.cs
     </div>
     <div class="dialog-actions"><button id="cancel" class="pl-btn" type="button">Cancel</button><button id="save" class="pl-btn pl-btn--primary" type="submit">Save</button></div>
   </form>
+</dialog>
+
+<dialog id="demo-dialog" aria-labelledby="demo-dialog-title">
+  <div class="dialog-panel">
+    <div class="dialog-head"><h2 id="demo-dialog-title">Demonstration board</h2><button class="icon-btn" id="demo-close-x" type="button" aria-label="Close">×</button></div>
+    <p>The repository includes an optional eight-card example covering every card type and status, plus an Epic with linked and inline child work.</p>
+    <p><strong>Nothing is loaded automatically.</strong> Demo operations only affect cards with the exact <code>simple-kanban-demo</code> source namespace. Ordinary cards are never changed.</p>
+    <div id="demo-status" class="demo-status" role="status">Checking demonstration state…</div>
+    <div class="dialog-actions demo-actions">
+      <button id="demo-cancel" class="pl-btn" type="button">Close</button>
+      <button id="demo-remove" class="pl-btn danger-action" type="button">Remove demo</button>
+      <button id="demo-reset" class="pl-btn" type="button">Reset demo</button>
+      <button id="demo-load" class="pl-btn pl-btn--primary" type="button">Load demo</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+  <div class="dialog-panel confirm-panel">
+    <div class="dialog-head"><h2 id="confirm-title">Confirm action</h2></div>
+    <p id="confirm-message"></p>
+    <div class="dialog-actions">
+      <button id="confirm-cancel" class="pl-btn" type="button">Cancel</button>
+      <button id="confirm-accept" class="pl-btn pl-btn--primary" type="button">Confirm</button>
+    </div>
+  </div>
 </dialog>
 <script type="module">{{JS}}</script>
 </body>
