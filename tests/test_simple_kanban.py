@@ -79,6 +79,17 @@ def test_view_is_single_slug_aware_page(plugin):
     assert 'localStorage.getItem("simple-kanban.collapsed")' in html
     assert 'localStorage.setItem("simple-kanban.collapsed"' in html
     assert "writing-mode:vertical-rl" in html
+    assert 'id="condensed-mode"' in html
+    assert 'localStorage.getItem("simple-kanban.condensed") === "true"' in html
+    assert 'localStorage.setItem("simple-kanban.condensed",String(state.condensed))' in html
+    assert 'board${state.condensed?" condensed":""}' in html
+    assert (
+        ".board.condensed .card-description,.board.condensed .meta,.board.condensed .card-actions{display:none}" in html
+    )
+    assert 'title.dataset.action="edit"' in html
+    assert 'node("div","condensed-rank-actions")' in html
+    assert ".board.condensed .condensed-rank-actions{display:flex" in html
+    assert 'document.getElementById("condensed-mode").disabled=state.archived||state.mode!=="board"' in html
     assert "Archive all ${count} Closed cards" in html
     assert "Confirm archive all ${count} Closed cards" in html
     assert "archiveConfirmUntil" in html

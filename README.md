@@ -2,7 +2,7 @@
 
 A self-reliant ranked List/Kanban working queue for [protoAgent](https://github.com/protoLabsAI/protoAgent).
 
-Status: **v0.1.0 development candidate**. Linux source qualification is complete; S1-dev live review is the next acceptance gate. S1-stable and Windows are not yet qualified.
+Status: **v0.2.0 S1-dev candidate**. Public v0.1.0 remains the S1-stable release; this candidate requires live development review before any publication or stable promotion.
 
 ## What it provides
 
@@ -10,6 +10,7 @@ Status: **v0.1.0 development candidate**. Linux source qualification is complete
 - Five durable states: Open, In progress, Blocked, Deferred, and Closed.
 - Atomic same-column rank and cross-column move operations.
 - Individually collapsible vertical status columns with the layout preference retained in the browser.
+- Board-wide **Condensed** mode that retains each card's drag handle, compact copyable ID, clickable title, and earlier/later controls; the preference is retained in the browser.
 - Drag/drop plus status selectors and earlier/later controls for keyboard, screen-reader, and mobile fallback.
 - Create, edit, move, close, reopen, and delete controls.
 - Compact `K-XXXXXXXX` card references with one-click copy of the complete durable `card_id`; either form supports direct agent lookup when unique.
@@ -41,7 +42,7 @@ CLI installation is fetch-only. Enable `simple_kanban` explicitly in the selecte
 
 ```sh
 python -m venv .venv
-.venv/bin/pip install -r requirements-dev.txt ruff
+.venv/bin/pip install -r requirements-dev.txt
 .venv/bin/ruff check .
 .venv/bin/ruff format --check tests/
 .venv/bin/pytest -q
@@ -56,8 +57,8 @@ Each task owns a stable ID, title, description, status, dense per-status positio
 | Platform | Status | Evidence / follow-up |
 |---|---|---|
 | Linux source | Tested | Store/API/registration/concurrency tests, Ruff, manifest and JS syntax checks |
-| S1-dev | Pending live acceptance | Exact candidate deployment and Dennis review |
-| S1-stable | Not deployed | Requires Dennis acceptance and separate promotion |
+| S1-dev | Pending v0.2.0 live acceptance | Exact candidate deployment and Dennis review |
+| S1-stable | v0.1.0 tested | v0.2.0 requires separate promotion after acceptance |
 | Windows | Not tested | Deferred; no PC1 work in this tranche |
 
 ## License
