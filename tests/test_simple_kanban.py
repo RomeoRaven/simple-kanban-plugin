@@ -82,6 +82,11 @@ def test_view_is_single_slug_aware_page(plugin):
     assert 'localStorage.getItem("simple-kanban.collapsed")' in html
     assert 'localStorage.setItem("simple-kanban.collapsed"' in html
     assert "writing-mode:vertical-rl" in html
+    assert (
+        ".column.collapsed .column-head{flex:1;min-height:180px;padding:8px 5px;flex-direction:column;justify-content:flex-start}"
+        in html
+    )
+    assert ".column.collapsed .column-controls{flex-direction:column;order:-1}" in html
     assert 'id="condensed-mode"' in html
     assert 'localStorage.getItem("simple-kanban.condensed") === "true"' in html
     assert 'localStorage.setItem("simple-kanban.condensed",String(state.condensed))' in html
