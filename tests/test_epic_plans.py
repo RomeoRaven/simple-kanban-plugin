@@ -48,6 +48,26 @@ def test_parser_fails_closed_for_malformed_child_reference_intent(plugin):
         assert summary["can_close"] is False
 
 
+def test_malformed_reference_owns_its_bullet_and_counts_each_unclosed_intent(plugin):
+    module = importlib.import_module(plugin.__name__ + ".epic_plans")
+    checked = "## Child tasks\n- [x] [[kanban-]] — Bad"
+    checked_summary = module.summarize_epic_plan(
+        {"id": "kanban-eeeeeeeeeeee", "issue_type": "epic", "description": checked}, {}
+    )
+    assert checked_summary["total_children"] == 1
+    assert checked_summary["completed_children"] == 0
+    assert checked_summary["open_children"] == 0
+    assert checked_summary["broken_references"] == 1
+
+    multiple = "## Child tasks\n- [[kanban-a] and [[kanban-b]"
+    multiple_summary = module.summarize_epic_plan(
+        {"id": "kanban-eeeeeeeeeeee", "issue_type": "epic", "description": multiple}, {}
+    )
+    assert multiple_summary["total_children"] == 2
+    assert multiple_summary["broken_references"] == 2
+    assert multiple_summary["can_close"] is False
+
+
 def test_summary_resolves_children_and_never_treats_related_as_blocking(plugin):
     module = importlib.import_module(plugin.__name__ + ".epic_plans")
     epic_id = "kanban-eeeeeeeeeeee"

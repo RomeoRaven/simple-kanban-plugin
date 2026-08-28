@@ -220,9 +220,9 @@ Epic structure remains text in `description`. Child and related references, inli
 
 | Platform | Status | Evidence / follow-up |
 |---|---|---|
-| Linux source | Tested | 29 store/API/parser/registration/concurrency tests, Ruff, formatting, manifest, and JS syntax |
+| Linux source | Tested | 35 store/API/parser/registration/concurrency tests, Ruff, formatting, manifest, and JS syntax |
 | S1-dev | Tested | Exact candidate deployment, desktop/mobile collapse behavior, persistence, health, and restart acceptance on protoAgent v0.153.1 |
-| S1-stable | Tested | Exact candidate deployment and operator acceptance on protoAgent v0.153.1; all 21 databases retained integrity |
+| S1-stable | v0.3.0 tested | Exact v0.3.0 deployment and operator acceptance on protoAgent v0.153.1; v0.3.1 promotion follows hotfix review and release |
 | Windows | Not tested | Route only an accepted candidate to PC1/PLA |
 
 ## License

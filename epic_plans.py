@@ -66,15 +66,16 @@ def parse_epic_plan(description: str) -> EpicPlan:
         intents = _REFERENCE_INTENT.findall(content)
         note = _note(content)
         if section == "children":
-            malformed_child_refs.extend(intent for intent in intents if not _CARD_ID.fullmatch(intent))
+            malformed = [intent for intent in intents if not _CARD_ID.fullmatch(intent)]
             scrubbed = _REFERENCE_INTENT.sub("", content)
-            if "[[" in scrubbed or "]]" in scrubbed:
-                malformed_child_refs.append("unclosed reference")
+            malformed.extend("unclosed reference" for _ in range(max(scrubbed.count("[["), scrubbed.count("]]"))))
+            malformed_child_refs.extend(malformed)
             if refs:
                 for card_id in refs:
                     if card_id not in seen_children:
                         child_refs.append((card_id, note))
                         seen_children.add(card_id)
+            if refs or malformed:
                 continue
             checkbox = _CHECKBOX.match(content)
             if checkbox:
