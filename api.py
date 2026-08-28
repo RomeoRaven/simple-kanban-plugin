@@ -41,7 +41,7 @@ def build_data_router():
     def status():
         return {
             "plugin": "simple_kanban",
-            "version": "0.3.0",
+            "version": "0.3.1",
             "status": "ready",
             "schema": 2,
             "integrity": store().integrity(),

@@ -2,7 +2,7 @@
 
 A self-reliant ranked List/Kanban working queue for [protoAgent](https://github.com/protoLabsAI/protoAgent).
 
-Status: **v0.3.0 release candidate accepted on S1 Stable**. It has passed source, S1-dev, and S1-stable acceptance on official protoAgent v0.153.1; Windows and macOS remain untested.
+Status: **v0.3.1 malformed-reference hotfix candidate**. v0.3.0 passed source, S1-dev, and S1-stable acceptance on official protoAgent v0.153.1; this hotfix makes malformed intended Epic child references fail closed. Windows and macOS remain untested.
 
 ## What it provides
 
@@ -214,15 +214,15 @@ node --check view/board.js
 
 Each task owns a stable ID, title, description, status, dense per-status position, optimistic-concurrency version, priority, issue type, assignee, lifecycle timestamps, close/archive metadata, and optional source identity. Every move runs in one SQLite transaction.
 
-Epic structure remains text in `description`. Child and related references, inline checkboxes, progress, and completion eligibility are parsed and resolved at read/mutation time; v0.3.0 adds no table, column, or migration.
+Epic structure remains text in `description`. Child and related references, inline checkboxes, progress, and completion eligibility are parsed and resolved at read/mutation time; v0.3.1 adds no table, column, or migration.
 
 ## Platform status
 
 | Platform | Status | Evidence / follow-up |
 |---|---|---|
-| Linux source | Tested | 29 store/API/parser/registration/concurrency tests, Ruff, formatting, manifest, and JS syntax |
+| Linux source | Tested | 35 store/API/parser/registration/concurrency tests, Ruff, formatting, manifest, and JS syntax |
 | S1-dev | Tested | Exact candidate deployment, desktop/mobile collapse behavior, persistence, health, and restart acceptance on protoAgent v0.153.1 |
-| S1-stable | Tested | Exact candidate deployment and operator acceptance on protoAgent v0.153.1; all 21 databases retained integrity |
+| S1-stable | v0.3.0 tested | Exact v0.3.0 deployment and operator acceptance on protoAgent v0.153.1; v0.3.1 promotion follows hotfix review and release |
 | Windows | Not tested | Route only an accepted candidate to PC1/PLA |
 
 ## License

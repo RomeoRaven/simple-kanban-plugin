@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from typing import Any
 
 _CARD_TOKEN = re.compile(r"\[\[(kanban-[^\]\s]+)\]\]", re.IGNORECASE)
+_REFERENCE_INTENT = re.compile(r"\[\[([^\]]*)\]\]")
+_CARD_ID = re.compile(r"kanban-[^\]\s]+", re.IGNORECASE)
 _HEADING = re.compile(r"^\s*##\s+(.+?)\s*$")
 _BULLET = re.compile(r"^\s*[-*]\s+(.*?)\s*$")
 _CHECKBOX = re.compile(r"^\[([ xX])\]\s*(.*?)\s*$")
@@ -28,6 +30,7 @@ class EpicPlan:
     child_refs: tuple[tuple[str, str], ...]
     inline_tasks: tuple[InlineTask, ...]
     related_refs: tuple[tuple[str, str], ...]
+    malformed_child_refs: tuple[str, ...]
 
 
 def compact_card_id(card_id: str) -> str:
@@ -46,6 +49,7 @@ def parse_epic_plan(description: str) -> EpicPlan:
     child_refs: list[tuple[str, str]] = []
     related_refs: list[tuple[str, str]] = []
     inline_tasks: list[InlineTask] = []
+    malformed_child_refs: list[str] = []
     seen_children: set[str] = set()
     seen_related: set[str] = set()
 
@@ -59,13 +63,19 @@ def parse_epic_plan(description: str) -> EpicPlan:
             continue
         content = bullet.group(1)
         refs = [match.casefold() for match in _CARD_TOKEN.findall(content)]
+        intents = _REFERENCE_INTENT.findall(content)
         note = _note(content)
         if section == "children":
+            malformed = [intent for intent in intents if not _CARD_ID.fullmatch(intent)]
+            scrubbed = _REFERENCE_INTENT.sub("", content)
+            malformed.extend("unclosed reference" for _ in range(max(scrubbed.count("[["), scrubbed.count("]]"))))
+            malformed_child_refs.extend(malformed)
             if refs:
                 for card_id in refs:
                     if card_id not in seen_children:
                         child_refs.append((card_id, note))
                         seen_children.add(card_id)
+            if refs or malformed:
                 continue
             checkbox = _CHECKBOX.match(content)
             if checkbox:
@@ -76,7 +86,7 @@ def parse_epic_plan(description: str) -> EpicPlan:
                     related_refs.append((card_id, note))
                     seen_related.add(card_id)
 
-    return EpicPlan(tuple(child_refs), tuple(inline_tasks), tuple(related_refs))
+    return EpicPlan(tuple(child_refs), tuple(inline_tasks), tuple(related_refs), tuple(malformed_child_refs))
 
 
 def summarize_epic_plan(task: dict[str, Any], cards: dict[str, dict[str, Any]]) -> dict[str, Any]:
@@ -84,7 +94,7 @@ def summarize_epic_plan(task: dict[str, Any], cards: dict[str, dict[str, Any]]) 
     plan = parse_epic_plan(str(task.get("description") or ""))
     task_id = str(task.get("id") or "")
     child_cards: list[dict[str, Any]] = []
-    broken = 0
+    broken = len(plan.malformed_child_refs)
     open_children = 0
 
     for card_id, note in plan.child_refs:
@@ -130,7 +140,7 @@ def summarize_epic_plan(task: dict[str, Any], cards: dict[str, dict[str, Any]]) 
             }
         )
 
-    total_children = len(child_cards) + len(inline)
+    total_children = len(child_cards) + len(inline) + len(plan.malformed_child_refs)
     completed_children = total_children - open_children - broken
     return {
         "total_children": total_children,

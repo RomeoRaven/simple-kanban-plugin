@@ -18,7 +18,7 @@ def client_for(plugin, tmp_path):
 def test_api_crud_and_conflict(plugin, tmp_path):
     client = client_for(plugin, tmp_path)
     status = client.get("/api/plugins/simple_kanban/status").json()
-    assert status["integrity"] == "ok" and status["version"] == "0.3.0" and status["schema"] == 2
+    assert status["integrity"] == "ok" and status["version"] == "0.3.1" and status["schema"] == 2
     created = client.post("/api/plugins/simple_kanban/tasks", json={"title": "API task"})
     assert created.status_code == 201
     task = created.json()["task"]
