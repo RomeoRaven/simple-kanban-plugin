@@ -137,7 +137,7 @@ def test_manifest_and_readme_document_complete_v030_how_to(plugin):
     manifest = yaml.safe_load((root / "protoagent.plugin.yaml").read_text())
     readme = (root / "README.md").read_text()
     contract = (root / "docs" / "EPIC_PLANS.md").read_text()
-    assert manifest["version"] == "0.3.0"
+    assert manifest["version"] == "0.3.1"
     for heading in (
         "## How to use Simple Kanban",
         "## How to use Epic plans",
@@ -146,5 +146,5 @@ def test_manifest_and_readme_document_complete_v030_how_to(plugin):
         "## Agent tools",
     ):
         assert heading in readme
-    assert "v0.3.0 adds no table, column, or migration" in readme
+    assert "v0.3.1 adds no table, column, or migration" in readme
     assert "Only exact level-two headings are interpreted" in contract

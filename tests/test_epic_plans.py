@@ -30,6 +30,22 @@ def test_parser_uses_only_exact_plan_sections(plugin):
         module.InlineTask("Record the accepted boundary", True),
     )
     assert parsed.related_refs == ((second, "Shares the provider boundary"),)
+    assert parsed.malformed_child_refs == ()
+
+
+def test_parser_fails_closed_for_malformed_child_reference_intent(plugin):
+    module = importlib.import_module(plugin.__name__ + ".epic_plans")
+    malformed = ("[[kanban-]]", "[[kanban-bad id]]", "[[not-a-kanban-id]]", "[[kanban-123456789abc]")
+    for value in malformed:
+        description = f"## Child tasks\n- {value} — Intended child"
+        parsed = module.parse_epic_plan(description)
+        summary = module.summarize_epic_plan(
+            {"id": "kanban-eeeeeeeeeeee", "issue_type": "epic", "description": description}, {}
+        )
+        assert parsed.malformed_child_refs
+        assert summary["broken_references"] == 1
+        assert summary["total_children"] == 1
+        assert summary["can_close"] is False
 
 
 def test_summary_resolves_children_and_never_treats_related_as_blocking(plugin):

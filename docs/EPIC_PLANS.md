@@ -1,6 +1,6 @@
 # Epic plan contract
 
-Status: v0.3.0 candidate
+Status: v0.3.1 candidate
 
 ## Purpose
 

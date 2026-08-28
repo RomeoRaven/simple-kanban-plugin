@@ -2,7 +2,7 @@
 
 A self-reliant ranked List/Kanban working queue for [protoAgent](https://github.com/protoLabsAI/protoAgent).
 
-Status: **v0.3.0 release candidate accepted on S1 Stable**. It has passed source, S1-dev, and S1-stable acceptance on official protoAgent v0.153.1; Windows and macOS remain untested.
+Status: **v0.3.1 malformed-reference hotfix candidate**. v0.3.0 passed source, S1-dev, and S1-stable acceptance on official protoAgent v0.153.1; this hotfix makes malformed intended Epic child references fail closed. Windows and macOS remain untested.
 
 ## What it provides
 
@@ -214,7 +214,7 @@ node --check view/board.js
 
 Each task owns a stable ID, title, description, status, dense per-status position, optimistic-concurrency version, priority, issue type, assignee, lifecycle timestamps, close/archive metadata, and optional source identity. Every move runs in one SQLite transaction.
 
-Epic structure remains text in `description`. Child and related references, inline checkboxes, progress, and completion eligibility are parsed and resolved at read/mutation time; v0.3.0 adds no table, column, or migration.
+Epic structure remains text in `description`. Child and related references, inline checkboxes, progress, and completion eligibility are parsed and resolved at read/mutation time; v0.3.1 adds no table, column, or migration.
 
 ## Platform status
 

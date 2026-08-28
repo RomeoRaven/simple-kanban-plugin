@@ -151,6 +151,25 @@ def test_epic_close_guard_rejects_missing_and_self_references(plugin, tmp_path):
         store.close(malformed["id"], expected_version=malformed["version"])
 
 
+@pytest.mark.parametrize("reference", ("[[kanban-]]", "[[kanban-bad id]]", "[[not-a-kanban-id]]", "[[kanban-abc]"))
+def test_epic_close_and_archive_fail_closed_for_malformed_reference_intent(plugin, tmp_path, reference):
+    store, module = _store(plugin, tmp_path)
+    epic = store.create(
+        title="Malformed child intent",
+        issue_type="epic",
+        description=f"## Child tasks\n- {reference} — Intended child",
+    )
+    assert epic["epic_plan"]["broken_references"] == 1
+    with pytest.raises(module.KanbanValidation, match="1 broken child reference"):
+        store.close(epic["id"], expected_version=epic["version"])
+
+    with sqlite3.connect(store.path) as conn:
+        conn.execute("UPDATE kanban_tasks SET status='closed', closed_at='legacy' WHERE id=?", (epic["id"],))
+    with pytest.raises(module.KanbanValidation, match="Malformed child intent"):
+        store.archive_closed()
+    assert store.get(epic["id"])["archived_at"] is None
+
+
 def test_epic_guard_covers_create_combined_move_and_closed_updates(plugin, tmp_path):
     store, module = _store(plugin, tmp_path)
     with pytest.raises(module.KanbanValidation, match="1 open child task"):
