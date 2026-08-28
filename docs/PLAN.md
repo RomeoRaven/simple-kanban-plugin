@@ -1,9 +1,9 @@
 # Kanban plugin — extraction specification
 
-Status: v0.3.0 Epic-plan implementation candidate for S1-dev acceptance; v0.2.0 remains stable and Windows remains unqualified
-Date: 2026-08-26
+Status: v0.3.0 accepted release candidate on S1 Stable; Windows remains unqualified
+Date: 2026-08-27
 Source behavior: accepted public v0.2.0 at `aee5236c93b691bee62c78294aafc6c991c041e8`
-Target host reviewed: upstream protoAgent `v0.147.0`
+Target host reviewed: official protoAgent `v0.153.1`
 Placement: external plugin (`new with reuse`)
 
 ## Decision

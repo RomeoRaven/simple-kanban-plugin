@@ -2,7 +2,7 @@
 
 A self-reliant ranked List/Kanban working queue for [protoAgent](https://github.com/protoLabsAI/protoAgent).
 
-Status: **v0.3.0 S1-dev candidate**. Public v0.2.0 remains the accepted release; this candidate requires live development review before publication or Stable promotion.
+Status: **v0.3.0 release candidate accepted on S1 Stable**. It has passed source, S1-dev, and S1-stable acceptance on official protoAgent v0.153.1; Windows and macOS remain untested.
 
 ## What it provides
 
@@ -220,9 +220,9 @@ Epic structure remains text in `description`. Child and related references, inli
 
 | Platform | Status | Evidence / follow-up |
 |---|---|---|
-| Linux source | Candidate tested | Store/API/parser/registration/concurrency tests, Ruff, manifest, and JS syntax |
-| S1-dev | Pending v0.3.0 live review | Exact candidate deployment and Dennis acceptance |
-| S1-stable | v0.2.0 accepted | Stable remains unchanged until separate release/promotion approval |
+| Linux source | Tested | 29 store/API/parser/registration/concurrency tests, Ruff, formatting, manifest, and JS syntax |
+| S1-dev | Tested | Exact candidate deployment, desktop/mobile collapse behavior, persistence, health, and restart acceptance on protoAgent v0.153.1 |
+| S1-stable | Tested | Exact candidate deployment and operator acceptance on protoAgent v0.153.1; all 21 databases retained integrity |
 | Windows | Not tested | Route only an accepted candidate to PC1/PLA |
 
 ## License
