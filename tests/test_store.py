@@ -96,6 +96,106 @@ def test_closed_reorder_preserves_terminal_metadata(plugin, tmp_path):
     assert reordered["close_reason"] == "accepted"
 
 
+def test_epic_close_guard_uses_linked_status_and_inline_checkboxes(plugin, tmp_path):
+    store, module = _store(plugin, tmp_path)
+    child = store.create(title="Implement child")
+    epic = store.create(
+        title="Larger outcome",
+        issue_type="epic",
+        description=(
+            f"## Child tasks\n- [[{child['id']}]] — Implement child\n"
+            "- [ ] Write operator notes\n\n"
+            "## Related cards\n- [[kanban-ffffffffffff]] — Missing peers do not block"
+        ),
+    )
+    assert epic["epic_plan"]["open_children"] == 2
+    assert epic["epic_plan"]["can_close"] is False
+    with pytest.raises(module.KanbanValidation, match="2 open child tasks"):
+        store.close(epic["id"], expected_version=epic["version"])
+
+    child = store.close(child["id"], expected_version=child["version"])
+    epic = store.update(
+        epic["id"],
+        expected_version=epic["version"],
+        description=(
+            f"## Child tasks\n- [[{child['id']}]] — Implement child\n"
+            "- [x] Write operator notes\n\n"
+            "## Related cards\n- [[kanban-ffffffffffff]] — Missing peers do not block"
+        ),
+    )
+    assert epic["epic_plan"]["can_close"] is True
+    closed = store.close(epic["id"], expected_version=epic["version"])
+    assert closed["status"] == "closed"
+
+
+def test_epic_close_guard_rejects_missing_and_self_references(plugin, tmp_path):
+    store, module = _store(plugin, tmp_path)
+    epic = store.create(title="Guarded epic", issue_type="epic")
+    epic = store.update(
+        epic["id"],
+        expected_version=epic["version"],
+        description=(f"## Child tasks\n- [[{epic['id']}]] — Self\n- [[kanban-aaaaaaaaaaaa]] — Missing"),
+    )
+    assert epic["epic_plan"]["broken_references"] == 2
+    assert epic["epic_plan"]["open_children"] == 0
+    with pytest.raises(module.KanbanValidation, match="2 broken child references"):
+        store.close(epic["id"], expected_version=epic["version"])
+
+    malformed = store.create(
+        title="Malformed reference",
+        issue_type="epic",
+        description="## Child tasks\n- [[kanban-REPLACE-ME]] — Placeholder",
+    )
+    assert malformed["epic_plan"]["broken_references"] == 1
+    with pytest.raises(module.KanbanValidation, match="1 broken child reference"):
+        store.close(malformed["id"], expected_version=malformed["version"])
+
+
+def test_epic_guard_covers_create_combined_move_and_closed_updates(plugin, tmp_path):
+    store, module = _store(plugin, tmp_path)
+    with pytest.raises(module.KanbanValidation, match="1 open child task"):
+        store.create(
+            title="Created closed",
+            status="closed",
+            issue_type="epic",
+            description="## Child tasks\n- [ ] Not finished",
+        )
+
+    task = store.create(title="Becoming an epic")
+    with pytest.raises(module.KanbanValidation, match="1 open child task"):
+        store.move(
+            task["id"],
+            destination_status="closed",
+            before_id=None,
+            expected_version=task["version"],
+            updates={"issue_type": "epic", "description": "## Child tasks\n- [ ] Not finished"},
+        )
+
+    closed = store.close(task["id"], expected_version=task["version"])
+    with pytest.raises(module.KanbanValidation, match="1 open child task"):
+        store.update(
+            closed["id"],
+            expected_version=closed["version"],
+            issue_type="epic",
+            description="## Child tasks\n- [ ] Added after closure",
+        )
+
+
+def test_archive_closed_is_atomic_when_legacy_epic_has_open_plan(plugin, tmp_path):
+    store, module = _store(plugin, tmp_path)
+    ordinary = store.create(title="Closed ordinary", status="closed")
+    epic = store.create(title="Legacy epic", status="closed", issue_type="epic")
+    with sqlite3.connect(store.path) as conn:
+        conn.execute(
+            "UPDATE kanban_tasks SET description=? WHERE id=?",
+            ("## Child tasks\n- [ ] Legacy unfinished task", epic["id"]),
+        )
+    with pytest.raises(module.KanbanValidation, match="Legacy epic"):
+        store.archive_closed()
+    assert store.get(ordinary["id"])["archived_at"] is None
+    assert store.get(epic["id"])["archived_at"] is None
+
+
 def test_archive_closed_is_durable_non_destructive_and_idempotent(plugin, tmp_path):
     store, module = _store(plugin, tmp_path)
     active = store.create(title="Still active")

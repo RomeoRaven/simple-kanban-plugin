@@ -1,9 +1,9 @@
 # Kanban plugin — extraction specification
 
-Status: v0.2.0 implementation candidate for S1-dev acceptance; v0.1.0 remains stable and Windows remains unqualified
-Date: 2026-08-23
-Source behavior: accepted RR candidate `90d77beaf29db6f1d2ca03e5c4988226d0dc5eca`
-Target host reviewed: upstream protoAgent `v0.147.0`
+Status: v0.3.0 accepted release candidate on S1 Stable; Windows remains unqualified
+Date: 2026-08-27
+Source behavior: accepted public v0.2.0 at `aee5236c93b691bee62c78294aafc6c991c041e8`
+Target host reviewed: official protoAgent `v0.153.1`
 Placement: external plugin (`new with reuse`)
 
 ## Decision
@@ -73,6 +73,12 @@ Default statuses: `open`, `in_progress`, `blocked`, `deferred`, `closed`.
 - Every vertical status column can collapse to a slim persisted rail without changing card state.
 - One persisted Board-wide Condensed toggle hides descriptions, metadata, and lifecycle actions so each card keeps its drag handle, compact copyable ID, clickable edit title, and earlier/later controls; List and Archived views remain unchanged.
 - Every card displays a compact `K-XXXXXXXX` reference beside a copy control for the exact durable `card_id`; agents can resolve either a unique compact reference or the copied full ID directly.
+- Epic cards keep plans in the existing description using exact Child tasks, Related cards, and Deferred follow-up sections; no relationship schema is added.
+- Linked child status, inline checkboxes, related counts, and reference integrity are derived at read time.
+- A purple text-labeled EPIC indicator remains visible across Board, Condensed, List, and Archived views.
+- Store-level guards reject incomplete Epic closure and atomically reject bulk archival when a legacy Closed Epic is still incomplete.
+- Destructive UI actions use a plugin-owned accessible confirmation dialog; sandbox-dependent browser-native dialogs are not part of the contract.
+- A versioned repository demo template is inert by default and can be explicitly loaded, reset, or removed only within its exact source namespace.
 
 ## Self-reliant architecture
 
@@ -81,12 +87,14 @@ simple-kanban-plugin/
   protoagent.plugin.yaml
   __init__.py
   store.py
+  demo.py
   api.py
   tools.py
   view/
     tasks.html
     tasks.js
     tasks.css
+  examples/demo-board.json
   skills/simple-kanban/SKILL.md
   tests/
   README.md
@@ -111,6 +119,7 @@ Gated plugin-owned routes under `/api/plugins/simple_kanban`:
 - close/reopen;
 - atomic move/reorder;
 - bulk Closed archival and archived-card listing;
+- opt-in demonstration status/load/reset/remove operations scoped to `simple-kanban-demo`;
 - optional one-time import preview/execute.
 
 Public page route: `/plugins/simple_kanban/view`.

@@ -18,6 +18,11 @@ Use the `simple_kanban_*` tools when the operator wants a lightweight ranked wor
 - On a stale-version conflict, list again and ask only when the operator's intent is no longer unambiguous.
 - Close rather than delete completed work unless the operator explicitly wants removal.
 - Use `simple_kanban_closed_archive` only when the operator wants every active Closed card archived. Archival preserves records and exact IDs; deletion does not.
+- Use type `epic` when one card owns a larger outcome and plan. Keep the plan in the description under exact `## Child tasks`, `## Related cards`, and `## Deferred follow-up` headings.
+- Reference cards with their complete `[[kanban-…]]` ID. Under Child tasks, linked-card status and unchecked inline `- [ ]` items block Epic closure; Related cards and Deferred follow-up never block it.
+- Do not claim an Epic is complete or attempt to bypass the guard while `epic_plan.can_close` is false. Resolve, complete, remove, or deliberately defer the blocking item first.
+- Cards with `source_kind=simple-kanban-demo` are editable examples, not automatically real project work. Do not infer priorities or execution requests from them.
+- Demo Load, Reset, and Remove are explicit operator actions in the Kanban **Demo** dialog. Never reset or remove demo-owned cards without a direct request; those operations intentionally discard demo edits but never select ordinary cards.
 
 ## Tools
 
